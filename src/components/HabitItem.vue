@@ -2,10 +2,12 @@
 import { ref, onMounted, computed } from "vue";
 import type { Habit, CheckIn } from "../services/db";
 import { checkInService } from "../services/db";
-import Input from "./ui/Input.vue";
-import Select from "./ui/Select.vue";
-import IconButton from "./ui/IconButton.vue";
-import Modal from "./ui/Modal.vue";
+import Button from "./ui/Button.vue";
+import Calendar from "./ui/Calendar.vue";
+import CompletionModal from "./modals/CompletionModal.vue";
+import StreakModal from "./modals/StreakModal.vue";
+import HistoryModal from "./modals/HistoryModal.vue";
+import EditHabitModal from "./modals/EditHabitModal.vue";
 
 const props = defineProps<{
   habit: Habit;
@@ -15,11 +17,13 @@ const props = defineProps<{
 const emit = defineEmits(["update", "delete", "toggleExpand"]);
 
 const isEditing = ref(false);
-const editedName = ref(props.habit.name);
-const editedFrequency = ref(props.habit.frequency);
-const streak = ref(0);
 const weekCheckIns = ref<CheckIn[]>([]);
 const showCompletionModal = ref(false);
+const showStreakModal = ref(false);
+const currentStreak = ref(0);
+const longestStreak = ref(0);
+const showHistoryModal = ref(false);
+const habitHistory = ref<CheckIn[]>([]);
 
 const frequencyOptions = [
   { value: 1, label: "1 day per week" },
@@ -65,6 +69,71 @@ const weekDays = computed(() => {
   return days;
 });
 
+const weekStart = computed(() => {
+  const today = new Date();
+  const start = new Date(today);
+  start.setDate(today.getDate() - 6);
+  start.setHours(0, 0, 0, 0);
+  return start;
+});
+
+const weekEnd = computed(() => {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return today;
+});
+
+const calculateStreak = async () => {
+  if (!props.habit.id) return;
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const allCheckIns = await checkInService.getForHabit(
+    props.habit.id,
+    new Date(0),
+    today
+  );
+
+  const sortedCheckIns = allCheckIns.sort(
+    (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
+  );
+
+  let currentCount = 0;
+  let longestCount = 0;
+  let tempCount = 0;
+  let lastDate: Date | null = null;
+
+  for (const checkIn of sortedCheckIns) {
+    const checkInDate = new Date(checkIn.date);
+    checkInDate.setHours(0, 0, 0, 0);
+
+    if (checkIn.completed) {
+      if (!lastDate || isConsecutiveDay(lastDate, checkInDate)) {
+        tempCount++;
+        if (checkInDate.getTime() === today.getTime()) {
+          currentCount = tempCount;
+        }
+      } else {
+        tempCount = 1;
+      }
+      longestCount = Math.max(longestCount, tempCount);
+    } else {
+      tempCount = 0;
+    }
+    lastDate = checkInDate;
+  }
+
+  currentStreak.value = currentCount;
+  longestStreak.value = longestCount;
+};
+
+const isConsecutiveDay = (date1: Date, date2: Date): boolean => {
+  const diffTime = Math.abs(date2.getTime() - date1.getTime());
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  return diffDays === 1;
+};
+
 const loadWeekCheckIns = async () => {
   if (!props.habit.id) return;
 
@@ -78,70 +147,99 @@ const loadWeekCheckIns = async () => {
     weekStart,
     today
   );
+  await calculateStreak();
 };
 
-const toggleDay = async (day: {
-  date: Date;
-  isToday: boolean;
-  isCompleted: boolean;
-}) => {
+const toggleDay = async (date: Date) => {
   if (!props.habit.id) return;
 
-  const date = new Date(day.date);
   date.setHours(0, 0, 0, 0);
 
   await checkInService.toggle(props.habit.id, date);
   await loadWeekCheckIns();
 
-  if (!day.isCompleted) {
+  const isCompleted = weekCheckIns.value.find((c) => {
+    const checkInDate = new Date(c.date);
+    checkInDate.setHours(0, 0, 0, 0);
+    return checkInDate.getTime() === date.getTime();
+  })?.completed;
+
+  if (!isCompleted) {
     showCompletionModal.value = true;
+
+    if (currentStreak.value > 0 && currentStreak.value % 7 === 0) {
+      showStreakModal.value = true;
+    }
   }
 };
 
-const save = () => {
-  if (!editedName.value.trim()) {
-    alert("Please enter a habit name");
-    return;
-  }
-
-  emit("update", {
-    ...props.habit,
-    name: editedName.value.trim(),
-    frequency: editedFrequency.value,
-  });
-
+const save = (updatedHabit: Habit) => {
+  emit("update", updatedHabit);
   isEditing.value = false;
 };
 
-const cancel = () => {
-  editedName.value = props.habit.name;
-  editedFrequency.value = props.habit.frequency;
-  isEditing.value = false;
+const loadHabitHistory = async () => {
+  if (!props.habit.id) return;
+
+  const today = new Date();
+  const startDate = new Date();
+  startDate.setMonth(today.getMonth() - 1);
+
+  habitHistory.value = await checkInService.getForHabit(
+    props.habit.id,
+    startDate,
+    today
+  );
 };
 
-onMounted(loadWeekCheckIns);
+const analytics = computed(() => {
+  const weeklyCompletions = weekCheckIns.value.filter(
+    (c) => c.completed
+  ).length;
+  const weeklyAdherence = Math.min(
+    100,
+    (weeklyCompletions / props.habit.frequency) * 100
+  );
+
+  const totalCompletions = habitHistory.value.filter((c) => c.completed).length;
+  const totalDays = habitHistory.value.length;
+  const allTimeAdherence =
+    totalDays > 0 ? Math.min(100, (totalCompletions / totalDays) * 100) : 0;
+
+  return {
+    weekly: {
+      completions: weeklyCompletions,
+      adherence: Math.round(weeklyAdherence),
+      target: props.habit.frequency,
+    },
+    allTime: {
+      completions: totalCompletions,
+      adherence: Math.round(allTimeAdherence),
+      longestStreak: longestStreak.value,
+    },
+  };
+});
+
+onMounted(() => {
+  loadWeekCheckIns();
+  loadHabitHistory();
+});
 </script>
 
 <template>
   <div class="bg-white rounded-lg border border-gray-200">
-    <div v-if="!isEditing" class="p-4">
-      <div class="flex items-center justify-between">
+    <div class="p-4">
+      <div class="flex items-start justify-between">
         <div class="flex-1 min-w-0">
           <div class="flex items-center gap-3">
             <button
               @click="emit('toggleExpand')"
-              class="flex-shrink-0 w-5 h-5 rounded border border-gray-300 hover:border-gray-400 transition-colors">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                class="w-5 h-5 text-gray-600"
+              class="flex-shrink-0 w-5 h-5 cursor-pointer">
+              <img
+                src="@/assets/icons/chevron-down.svg"
+                class="w-5 h-5 text-gray-600 transition-transform duration-200"
                 :class="{ 'transform rotate-180': isExpanded }"
-                viewBox="0 0 20 20"
-                fill="currentColor">
-                <path
-                  fill-rule="evenodd"
-                  d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
-                  clip-rule="evenodd" />
-              </svg>
+                alt="Toggle expand" />
             </button>
             <h3 class="text-lg font-medium text-gray-900 truncate">
               {{ habit.name }}
@@ -154,40 +252,29 @@ onMounted(loadWeekCheckIns);
                   ?.label
               }}
             </p>
-            <p class="text-sm text-gray-500">Streak: {{ streak }} days</p>
+            <button
+              @click="showStreakModal = true"
+              class="text-sm text-gray-500 hover:text-gray-700 transition-colors">
+              <span class="font-medium text-gray-900">{{ currentStreak }}</span>
+              day streak
+            </button>
           </div>
         </div>
         <div class="flex items-center space-x-2 ml-4">
-          <IconButton
+          <Button
             variant="secondary"
             size="sm"
             title="Edit habit"
             @click="isEditing = true">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              class="h-4 w-4"
-              viewBox="0 0 20 20"
-              fill="currentColor">
-              <path
-                d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
-            </svg>
-          </IconButton>
-          <IconButton
+            <img src="@/assets/icons/edit.svg" class="h-4 w-4" alt="Edit" />
+          </Button>
+          <Button
             variant="danger"
             size="sm"
             title="Delete habit"
             @click="emit('delete', habit.id)">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              class="h-4 w-4"
-              viewBox="0 0 20 20"
-              fill="currentColor">
-              <path
-                fill-rule="evenodd"
-                d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z"
-                clip-rule="evenodd" />
-            </svg>
-          </IconButton>
+            <img src="@/assets/icons/trash.svg" class="h-4 w-4" alt="Delete" />
+          </Button>
         </div>
       </div>
 
@@ -205,91 +292,48 @@ onMounted(loadWeekCheckIns);
         </div>
       </div>
 
-      <div v-if="isExpanded" class="mt-4 grid grid-cols-7 gap-1">
-        <button
-          v-for="day in weekDays"
-          :key="day.date.toISOString()"
-          @click="toggleDay(day)"
-          class="h-12 flex items-center justify-center rounded-lg border transition-colors"
-          :class="[
-            day.isToday ? 'border-gray-800' : 'border-gray-200',
-            day.isCompleted
-              ? 'bg-gray-800 text-white'
-              : 'bg-white text-gray-600 hover:bg-gray-50',
-          ]">
-          <span class="text-xs font-medium">
-            {{ day.date.toLocaleDateString("en-US", { weekday: "short" }) }}
-          </span>
-        </button>
+      <div v-if="isExpanded" class="mt-4">
+        <Calendar
+          :check-ins="weekCheckIns"
+          :start-date="weekStart"
+          :end-date="weekEnd"
+          :show-week-days="true"
+          view="week"
+          :is-editable="true"
+          @toggle="toggleDay" />
       </div>
     </div>
 
-    <div v-else class="p-4 space-y-4">
-      <Input
-        v-model="editedName"
-        label="Habit Name"
-        placeholder="Enter habit name"
-        required />
-
-      <Select
-        v-model="editedFrequency"
-        :options="frequencyOptions"
-        label="Weekly Target" />
-
-      <div class="flex space-x-2">
-        <IconButton
-          variant="primary"
-          size="sm"
-          title="Save changes"
-          @click="save">
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            class="h-4 w-4"
-            viewBox="0 0 20 20"
-            fill="currentColor">
-            <path
-              fill-rule="evenodd"
-              d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-              clip-rule="evenodd" />
-          </svg>
-        </IconButton>
-        <IconButton
-          variant="secondary"
-          size="sm"
-          title="Cancel"
-          @click="cancel">
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            class="h-4 w-4"
-            viewBox="0 0 20 20"
-            fill="currentColor">
-            <path
-              fill-rule="evenodd"
-              d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
-              clip-rule="evenodd" />
-          </svg>
-        </IconButton>
-      </div>
-    </div>
-
-    <Modal
+    <CompletionModal
       :is-open="showCompletionModal"
-      title="Great job! 🎉"
-      @close="showCompletionModal = false">
-      <div class="space-y-4">
-        <p class="text-gray-600">
-          You've completed your habit for today. Keep up the good work!
-        </p>
-        <div class="flex justify-end">
-          <IconButton
-            variant="primary"
-            size="sm"
-            title="Close"
-            @click="showCompletionModal = false">
-            Close
-          </IconButton>
-        </div>
-      </div>
-    </Modal>
+      @close="showCompletionModal = false" />
+
+    <StreakModal
+      :is-open="showStreakModal"
+      :current-streak="currentStreak"
+      :longest-streak="longestStreak"
+      @close="showStreakModal = false" />
+
+    <div class="mt-4 flex justify-end">
+      <Button
+        variant="secondary"
+        size="sm"
+        title="View History"
+        @click="showHistoryModal = true">
+        View History
+      </Button>
+    </div>
+
+    <HistoryModal
+      :is-open="showHistoryModal"
+      :habit-history="habitHistory"
+      :analytics="analytics"
+      @close="showHistoryModal = false" />
+
+    <EditHabitModal
+      :is-open="isEditing"
+      :habit="habit"
+      @close="isEditing = false"
+      @save="save" />
   </div>
 </template>
