@@ -8,41 +8,82 @@ export interface Habit {
   updatedAt: Date;
 }
 
-class HabitDatabase extends Dexie {
-  habits!: Table<Habit>;
-
-  constructor() {
-    super("HabitTrackerDB");
-    this.version(1).stores({
-      habits: "++id, name",
-    });
-  }
+export interface CheckIn {
+  id?: number;
+  habitId: number;
+  date: Date;
+  completed: boolean;
+  createdAt: Date;
 }
 
-export const db = new HabitDatabase();
+const createDatabase = () => {
+  const db = new Dexie("HabitTrackerDB");
+  db.version(1).stores({
+    habits: "++id, name",
+    checkIns: "++id, habitId, date, [habitId+date]",
+  });
+  return db;
+};
+
+export const db = createDatabase();
 
 export const habitService = {
-  async getAll() {
-    return await db.habits.toArray();
+  getAll: async () => {
+    return await db.table("habits").toArray();
   },
 
-  async add(habit: Omit<Habit, "id" | "createdAt" | "updatedAt">) {
+  add: async (habit: Omit<Habit, "id" | "createdAt" | "updatedAt">) => {
     const timestamp = new Date();
-    return await db.habits.add({
+    return await db.table("habits").add({
       ...habit,
       createdAt: timestamp,
       updatedAt: timestamp,
     });
   },
 
-  async update(id: number, changes: Partial<Omit<Habit, "id" | "createdAt">>) {
-    return await db.habits.update(id, {
+  update: async (id: number, changes: Partial<Omit<Habit, "id" | "createdAt">>) => {
+    return await db.table("habits").update(id, {
       ...changes,
       updatedAt: new Date(),
     });
   },
 
-  async delete(id: number) {
-    return await db.habits.delete(id);
+  delete: async (id: number) => {
+    await db.table("checkIns").where("habitId").equals(id).delete();
+    return await db.table("habits").delete(id);
+  },
+};
+
+export const checkInService = {
+  getForHabit: async (habitId: number, startDate: Date, endDate: Date) => {
+    return await db.table("checkIns")
+      .where("habitId")
+      .equals(habitId)
+      .and((checkIn) => checkIn.date >= startDate && checkIn.date <= endDate)
+      .toArray();
+  },
+
+  getForDate: async (date: Date) => {
+    return await db.table("checkIns").where("date").equals(date).toArray();
+  },
+
+  toggle: async (habitId: number, date: Date) => {
+    const existing = await db.table("checkIns")
+      .where(["habitId", "date"])
+      .equals([habitId, date])
+      .first();
+
+    if (existing) {
+      return await db.table("checkIns").update(existing.id!, {
+        completed: !existing.completed,
+      });
+    } else {
+      return await db.table("checkIns").add({
+        habitId,
+        date,
+        completed: true,
+        createdAt: new Date(),
+      });
+    }
   },
 };

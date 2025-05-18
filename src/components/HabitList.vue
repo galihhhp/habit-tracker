@@ -1,79 +1,62 @@
 <script setup lang="ts">
-import { ref, onMounted } from "vue";
+import { ref } from "vue";
 import type { Habit } from "../services/db";
 import { habitService } from "../services/db";
 import HabitItem from "@/components/HabitItem.vue";
 import HabitForm from "@/components/HabitForm.vue";
-import Button from "./ui/Button.vue";
 import Modal from "./ui/Modal.vue";
+import Button from "./ui/Button.vue";
 
 const habits = ref<Habit[]>([]);
+const expandedHabitId = ref<number | null>(null);
 const showForm = ref(false);
-const isLoading = ref(true);
 
 const loadHabits = async () => {
-  try {
-    habits.value = await habitService.getAll();
-  } catch (error) {
-    console.error("Failed to load habits:", error);
-  } finally {
-    isLoading.value = false;
-  }
+  habits.value = await habitService.getAll();
 };
 
 const addHabit = async (
   habit: Omit<Habit, "id" | "createdAt" | "updatedAt">
 ) => {
-  try {
-    await habitService.add(habit);
-    await loadHabits();
-    showForm.value = false;
-  } catch (error) {
-    console.error("Failed to add habit:", error);
-  }
+  await habitService.add(habit);
+  await loadHabits();
+  showForm.value = false;
 };
 
 const updateHabit = async (habit: Habit) => {
-  try {
-    if (habit.id) {
-      await habitService.update(habit.id, {
-        name: habit.name,
-        frequency: habit.frequency,
-      });
-      await loadHabits();
-    }
-  } catch (error) {
-    console.error("Failed to update habit:", error);
-  }
+  if (!habit.id) return;
+  await habitService.update(habit.id, habit);
+  await loadHabits();
 };
 
 const deleteHabit = async (id: number) => {
-  try {
-    await habitService.delete(id);
-    await loadHabits();
-  } catch (error) {
-    console.error("Failed to delete habit:", error);
-  }
+  if (!confirm("Are you sure you want to delete this habit?")) return;
+  await habitService.delete(id);
+  await loadHabits();
 };
 
-onMounted(loadHabits);
+const toggleExpand = (habitId: number) => {
+  expandedHabitId.value = expandedHabitId.value === habitId ? null : habitId;
+};
+
+loadHabits();
 </script>
 
 <template>
   <div class="max-w-2xl mx-auto px-4 py-8">
     <div class="space-y-6">
       <div class="flex items-center justify-between">
-        <h1 class="text-2xl font-bold tracking-tight text-gray-900">
-          Habit Tracker
-        </h1>
-        <Button @click="showForm = true">Add Habit</Button>
+        <h2 class="text-2xl font-bold text-gray-900">My Habits</h2>
+        <Button
+          variant="primary"
+          size="sm"
+          title="Add new habit"
+          @click="showForm = true">
+          Add Habit
+        </Button>
       </div>
 
-      <div v-if="isLoading" class="text-center py-12">
-        <p class="text-gray-500">Loading habits...</p>
-      </div>
-
-      <div v-else-if="habits.length === 0" class="text-center py-12">
+      <div v-if="habits.length === 0" class="text-center py-12">
         <p class="text-gray-500">
           No habits yet. Add your first habit to get started!
         </p>
@@ -84,8 +67,10 @@ onMounted(loadHabits);
           v-for="habit in habits"
           :key="habit.id"
           :habit="habit"
+          :is-expanded="expandedHabitId === habit.id"
           @update="updateHabit"
-          @delete="deleteHabit" />
+          @delete="deleteHabit"
+          @toggle-expand="toggleExpand(habit.id!)" />
       </div>
 
       <Modal
