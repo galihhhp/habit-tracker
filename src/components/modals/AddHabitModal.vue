@@ -4,6 +4,7 @@ import type { Habit } from "@/services/db";
 import Input from "../ui/Input.vue";
 import Button from "../ui/Button.vue";
 import Modal from "../ui/Modal.vue";
+import { aiService } from "@/services/ai";
 
 const props = defineProps<{
   isOpen: boolean;
@@ -18,6 +19,20 @@ const name = ref("");
 const description = ref("");
 const startDate = ref("");
 const endDate = ref("");
+const isGeneratingDescription = ref(false);
+
+const generateDescription = async () => {
+  if (!name.value.trim() || isGeneratingDescription.value) return;
+
+  isGeneratingDescription.value = true;
+  try {
+    description.value = await aiService.getHabitDescription(name.value);
+  } catch (error) {
+    console.error("Failed to generate description:", error);
+  } finally {
+    isGeneratingDescription.value = false;
+  }
+};
 
 const handleSubmit = () => {
   if (!name.value.trim() || !startDate.value || !endDate.value) return;
@@ -37,8 +52,6 @@ const handleSubmit = () => {
     endDate: end,
     isActive: true,
     history: [],
-    currentStreak: 0,
-    longestStreak: 0,
     completionRate: 0,
   });
 
@@ -78,11 +91,30 @@ onUnmounted(() => {
           placeholder="Enter habit name"
           required />
 
-        <Input
-          v-model="description"
-          label="Description"
-          placeholder="Enter habit description"
-          type="textarea" />
+        <div class="space-y-2">
+          <div class="flex justify-between items-center">
+            <label class="block text-sm font-medium text-gray-700"
+              >Description</label
+            >
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              :loading="isGeneratingDescription"
+              @click="generateDescription">
+              {{
+                isGeneratingDescription
+                  ? "Generating..."
+                  : "✨ Generate with AI"
+              }}
+            </Button>
+          </div>
+          <textarea
+            v-model="description"
+            rows="3"
+            class="w-full rounded-md border-gray-300 shadow-sm focus:border-gray-800 focus:ring-gray-800"
+            placeholder="Describe your habit"></textarea>
+        </div>
 
         <Input v-model="startDate" label="Start Date" type="date" required />
 

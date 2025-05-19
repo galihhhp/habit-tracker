@@ -54,6 +54,11 @@ const handleEditHabit = (habit: Habit) => {
   showEditModal.value = true;
 };
 
+const handleUpdateHabit = async (habit: Habit) => {
+  await habitService.update(habit.id!, habit);
+  await loadHabits();
+};
+
 const handleViewHistory = async (habit: Habit) => {
   if (!habit.id) return;
 
@@ -130,14 +135,14 @@ const filteredHabits = computed(() => {
     case "name":
       result.sort((a, b) => a.name.localeCompare(b.name));
       break;
-    case "streak":
-      result.sort((a, b) => (b.currentStreak || 0) - (a.currentStreak || 0));
-      break;
     case "completion":
       result.sort((a, b) => (b.completionRate || 0) - (a.completionRate || 0));
       break;
     case "created":
-      result.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+      result.sort(
+        (a, b) =>
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      );
       break;
   }
 
@@ -181,7 +186,6 @@ onMounted(loadHabits);
                 v-model="sortBy"
                 :options="[
                   { value: 'name', label: 'Sort by Name' },
-                  { value: 'streak', label: 'Sort by Current Streak' },
                   { value: 'completion', label: 'Sort by Completion Rate' },
                   { value: 'created', label: 'Sort by Recently Added' },
                 ]" />
@@ -190,7 +194,7 @@ onMounted(loadHabits);
 
           <HabitList
             :habits="paginatedHabits"
-            @update="handleEditHabit"
+            @update="handleUpdateHabit"
             @delete="handleDeleteHabit"
             @edit="handleEditHabit"
             @view-history="handleViewHistory" />
@@ -255,7 +259,6 @@ onMounted(loadHabits);
                 habitHistory.length) *
                 100
             ) || 0,
-          longestStreak: editingHabit.longestStreak,
         },
       }"
       @close="handleCloseHistoryModal" />

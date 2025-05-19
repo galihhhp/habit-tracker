@@ -16,7 +16,6 @@ const props = defineProps<{
     allTime: {
       completions: number;
       adherence: number;
-      longestStreak: number;
     };
   };
 }>();
@@ -83,17 +82,11 @@ const historyEnd = computed(() => {
             </div>
             <div class="text-sm text-gray-600">Overall Success Rate</div>
           </div>
-          <div class="text-center p-4 bg-gray-50 rounded-lg">
-            <div class="text-2xl font-bold text-gray-900">
-              {{ analytics.allTime.longestStreak }}
-            </div>
-            <div class="text-sm text-gray-600">Longest Streak</div>
-          </div>
         </div>
       </div>
 
       <div class="bg-white rounded-lg border border-gray-200 p-4">
-        <h3 class="text-lg font-medium text-gray-900 mb-4">Monthly Calendar</h3>
+        <h3 class="text-lg font-medium text-gray-900 mb-4">Weekly Calendar</h3>
         <Calendar
           :check-ins="habitHistory"
           :start-date="historyStart"

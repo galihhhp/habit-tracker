@@ -2,8 +2,9 @@
 import { ref, onMounted, computed } from "vue";
 import type { Habit, CheckIn } from "../services/db";
 import type { Achievement } from "@/services/achievements";
-import { checkInService } from "../services/db";
+import { checkInService, habitService } from "../services/db";
 import { checkAchievements, getTotalPoints } from "@/services/achievements";
+import { aiService } from "@/services/ai";
 import Button from "./ui/Button.vue";
 import Calendar from "./ui/Calendar.vue";
 import CompletionModal from "./modals/CompletionModal.vue";
@@ -12,6 +13,7 @@ import HistoryModal from "./modals/HistoryModal.vue";
 import EditHabitModal from "./modals/EditHabitModal.vue";
 import DropdownMenu from "./ui/DropdownMenu.vue";
 import AchievementsModal from "./modals/AchievementsModal.vue";
+import HabitPredictions from "./predictions/HabitPredictions.vue";
 
 const props = defineProps<{
   habit: Habit;
@@ -36,6 +38,11 @@ const showHistoryModal = ref(false);
 const habitHistory = ref<CheckIn[]>([]);
 const showAchievementsModal = ref(false);
 const newAchievements = ref<Achievement[]>([]);
+const predictions = ref<{
+  milestones: Array<{ period: string; prediction: string }>;
+  targetPrediction: string;
+} | null>(null);
+const isGeneratingPredictions = ref(false);
 
 const frequencyOptions = [
   { value: "daily", label: "Daily" },
@@ -280,6 +287,51 @@ const points = computed(() => {
   return props.habit.id ? getTotalPoints(props.habit.id) : 0;
 });
 
+const generatePredictions = async () => {
+  if (!props.habit.id || isGeneratingPredictions.value) return;
+
+  isGeneratingPredictions.value = true;
+  try {
+    const predictions = await aiService.getHabitPredictions(
+      props.habit.name,
+      props.habit.description || undefined,
+      targetDaysNum.value
+    );
+
+    const habitToUpdate = {
+      ...props.habit,
+      predictions,
+      startDate: new Date(props.habit.startDate).toISOString(),
+      endDate: new Date(props.habit.endDate).toISOString(),
+      createdAt: new Date(props.habit.createdAt).toISOString(),
+      updatedAt: new Date().toISOString(),
+      history: props.habit.history.map((h) => ({
+        ...h,
+        date: new Date(h.date).toISOString(),
+      })),
+    };
+
+    await habitService.update(props.habit.id, habitToUpdate);
+
+    emit("update", {
+      ...props.habit,
+      predictions,
+      startDate: new Date(props.habit.startDate),
+      endDate: new Date(props.habit.endDate),
+      createdAt: new Date(props.habit.createdAt),
+      updatedAt: new Date(),
+      history: props.habit.history.map((h) => ({
+        ...h,
+        date: new Date(h.date),
+      })),
+    });
+  } catch (error) {
+    console.error("Failed to generate predictions:", error);
+  } finally {
+    isGeneratingPredictions.value = false;
+  }
+};
+
 onMounted(() => {
   loadWeekCheckIns();
   loadHabitHistory();
@@ -309,6 +361,19 @@ onMounted(() => {
             variant="secondary"
             @click="showAchievementsModal = true"
             >🏆 {{ points }} pts
+          </Button>
+          <Button
+            v-if="!habit.predictions"
+            size="sm"
+            variant="secondary"
+            :loading="isGeneratingPredictions"
+            :disabled="isGeneratingPredictions"
+            @click="generatePredictions">
+            {{
+              isGeneratingPredictions
+                ? "Generating Insights..."
+                : "✨ Get AI Insights"
+            }}
           </Button>
         </div>
       </div>
@@ -399,7 +464,7 @@ onMounted(() => {
       </div>
     </div>
 
-    <div v-if="isExpanded" class="mt-4">
+    <div v-if="isExpanded" class="mt-4 space-y-6">
       <Calendar
         :check-ins="weekCheckIns"
         :start-date="weekStart"
@@ -408,6 +473,10 @@ onMounted(() => {
         view="week"
         :is-editable="true"
         @toggle="toggleDay" />
+
+      <HabitPredictions
+        v-if="habit.predictions"
+        :predictions="habit.predictions" />
     </div>
   </div>
 
