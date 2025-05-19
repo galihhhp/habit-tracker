@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from "vue";
-import type { Habit } from "./services/db";
-import { habitService } from "./services/db";
+import type { Habit, CheckIn } from "./services/db";
+import { habitService, checkInService } from "./services/db";
 import AddHabitModal from "@/components/modals/AddHabitModal.vue";
 import EditHabitModal from "@/components/modals/EditHabitModal.vue";
 import Button from "./components/ui/Button.vue";
@@ -11,6 +11,8 @@ import Select from "./components/ui/Select.vue";
 import Input from "./components/ui/Input.vue";
 import { useSearchParams } from "./composables/useSearchParams";
 import DeleteConfirmationModal from "./components/modals/DeleteConfirmationModal.vue";
+import HabitItem from "./components/HabitItem.vue";
+import HistoryModal from "./components/modals/HistoryModal.vue";
 
 const habits = ref<Habit[]>([]);
 const showAddModal = ref(false);
@@ -19,6 +21,8 @@ const editingHabit = ref<Habit | null>(null);
 const { searchQuery, sortBy, filterBy, page, itemsPerPage } = useSearchParams();
 const showDeleteModal = ref(false);
 const deletingHabitId = ref<number | null>(null);
+const showHistoryModal = ref(false);
+const habitHistory = ref<CheckIn[]>([]);
 
 const loadHabits = async () => {
   try {
@@ -48,6 +52,22 @@ const handleSaveHabit = async (
 const handleEditHabit = (habit: Habit) => {
   editingHabit.value = habit;
   showEditModal.value = true;
+};
+
+const handleViewHistory = async (habit: Habit) => {
+  if (!habit.id) return;
+
+  editingHabit.value = habit;
+  const today = new Date();
+  const startDate = new Date();
+  startDate.setMonth(today.getMonth() - 1);
+
+  habitHistory.value = await checkInService.getForHabit(
+    habit.id,
+    startDate,
+    today
+  );
+  showHistoryModal.value = true;
 };
 
 const handleSaveEdit = async (habit: Habit) => {
@@ -86,6 +106,12 @@ const handleConfirmDelete = async () => {
 const handleCloseDeleteModal = () => {
   showDeleteModal.value = false;
   deletingHabitId.value = null;
+};
+
+const handleCloseHistoryModal = () => {
+  showHistoryModal.value = false;
+  editingHabit.value = null;
+  habitHistory.value = [];
 };
 
 const filteredHabits = computed(() => {
@@ -165,7 +191,9 @@ onMounted(loadHabits);
           <HabitList
             :habits="paginatedHabits"
             @update="handleEditHabit"
-            @delete="handleDeleteHabit" />
+            @delete="handleDeleteHabit"
+            @edit="handleEditHabit"
+            @view-history="handleViewHistory" />
 
           <div class="mt-6">
             <Pagination
@@ -196,6 +224,34 @@ onMounted(loadHabits);
       :habit-name="habits.find((h) => h.id === deletingHabitId)?.name || ''"
       @close="handleCloseDeleteModal"
       @confirm="handleConfirmDelete" />
+
+    <HistoryModal
+      v-if="editingHabit"
+      :is-open="showHistoryModal"
+      :habit-history="habitHistory"
+      :analytics="{
+        weekly: {
+          completions: habitHistory.filter((h) => h.completed).length,
+          adherence:
+            Math.round(
+              (habitHistory.filter((h) => h.completed).length /
+                habitHistory.length) *
+                100
+            ) || 0,
+          target: editingHabit.targetDays,
+        },
+        allTime: {
+          completions: habitHistory.filter((h) => h.completed).length,
+          adherence:
+            Math.round(
+              (habitHistory.filter((h) => h.completed).length /
+                habitHistory.length) *
+                100
+            ) || 0,
+          longestStreak: editingHabit.longestStreak,
+        },
+      }"
+      @close="handleCloseHistoryModal" />
   </div>
 </template>
 

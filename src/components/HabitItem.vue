@@ -8,6 +8,7 @@ import CompletionModal from "./modals/CompletionModal.vue";
 import StreakModal from "./modals/StreakModal.vue";
 import HistoryModal from "./modals/HistoryModal.vue";
 import EditHabitModal from "./modals/EditHabitModal.vue";
+import DropdownMenu from "./ui/DropdownMenu.vue";
 
 const props = defineProps<{
   habit: Habit;
@@ -18,6 +19,8 @@ const emit = defineEmits<{
   (e: "update", habit: Habit): void;
   (e: "delete", id: number): void;
   (e: "toggle-expand", id: number): void;
+  (e: "edit", habit: Habit): void;
+  (e: "viewHistory", habit: Habit): void;
 }>();
 
 const isEditing = ref(false);
@@ -248,6 +251,14 @@ const handleToggleExpand = () => {
   }
 };
 
+const handleEdit = () => {
+  isEditing.value = true;
+};
+
+const handleViewHistory = () => {
+  showHistoryModal.value = true;
+};
+
 onMounted(() => {
   loadWeekCheckIns();
   loadHabitHistory();
@@ -298,36 +309,58 @@ onMounted(() => {
               clip-rule="evenodd" />
           </svg>
         </Button>
-        <Button
-          variant="secondary"
-          class="p-2"
-          title="Edit Habit"
-          @click="isEditing = true">
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            class="h-5 w-5"
-            viewBox="0 0 20 20"
-            fill="currentColor">
-            <path
-              d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
-          </svg>
-        </Button>
-        <Button
-          variant="danger"
-          class="p-2"
-          title="Delete Habit"
-          @click="handleDelete">
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            class="h-5 w-5"
-            viewBox="0 0 20 20"
-            fill="currentColor">
-            <path
-              fill-rule="evenodd"
-              d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z"
-              clip-rule="evenodd" />
-          </svg>
-        </Button>
+        <DropdownMenu>
+          <template #default>
+            <div class="py-1">
+              <button
+                type="button"
+                class="w-full text-left px-4 py-2 text-sm hover:bg-gray-100 flex items-center gap-2 text-gray-700"
+                @click="handleEdit">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  class="h-4 w-4"
+                  viewBox="0 0 20 20"
+                  fill="currentColor">
+                  <path
+                    d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
+                </svg>
+                Edit
+              </button>
+              <button
+                type="button"
+                class="w-full text-left px-4 py-2 text-sm hover:bg-gray-100 flex items-center gap-2 text-gray-700"
+                @click="handleViewHistory">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  class="h-4 w-4"
+                  viewBox="0 0 20 20"
+                  fill="currentColor">
+                  <path
+                    fill-rule="evenodd"
+                    d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z"
+                    clip-rule="evenodd" />
+                </svg>
+                View History
+              </button>
+              <button
+                type="button"
+                class="w-full text-left px-4 py-2 text-sm hover:bg-gray-100 flex items-center gap-2 text-red-600"
+                @click="handleDelete">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  class="h-4 w-4"
+                  viewBox="0 0 20 20"
+                  fill="currentColor">
+                  <path
+                    fill-rule="evenodd"
+                    d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z"
+                    clip-rule="evenodd" />
+                </svg>
+                Delete
+              </button>
+            </div>
+          </template>
+        </DropdownMenu>
       </div>
     </div>
 
@@ -366,16 +399,6 @@ onMounted(() => {
     :current-streak="currentStreak"
     :longest-streak="longestStreak"
     @close="showStreakModal = false" />
-
-  <div class="mt-4 flex justify-end">
-    <Button
-      variant="secondary"
-      size="sm"
-      title="View History"
-      @click="showHistoryModal = true">
-      View History
-    </Button>
-  </div>
 
   <HistoryModal
     :is-open="showHistoryModal"
