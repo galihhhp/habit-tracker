@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch, onMounted, onUnmounted } from "vue";
+import { ref, onMounted, onUnmounted } from "vue";
 import type { Habit } from "@/services/db";
 import Input from "../ui/Input.vue";
 import Select from "../ui/Select.vue";
@@ -8,12 +8,11 @@ import Modal from "../ui/Modal.vue";
 
 const props = defineProps<{
   isOpen: boolean;
-  habit: Habit;
 }>();
 
 const emit = defineEmits<{
   (e: "close"): void;
-  (e: "save", habit: Habit): void;
+  (e: "save", habit: Omit<Habit, "id" | "createdAt" | "updatedAt">): void;
 }>();
 
 const name = ref("");
@@ -27,32 +26,19 @@ const frequencyOptions = [
   { value: "monthly" as const, label: "Monthly" },
 ];
 
-watch(
-  () => props.habit,
-  (newHabit) => {
-    if (newHabit) {
-      name.value = newHabit.name;
-      description.value = newHabit.description || "";
-      frequency.value = newHabit.frequency;
-      targetDays.value = String(newHabit.targetDays);
-    }
-  },
-  { immediate: true }
-);
-
 const handleSubmit = () => {
   if (!name.value.trim()) return;
 
   emit("save", {
-    ...props.habit,
     name: name.value.trim(),
     description: description.value.trim(),
     frequency: frequency.value,
     targetDays: Number(targetDays.value),
-    history: props.habit.history.map((h) => ({
-      ...h,
-      date: new Date(h.date),
-    })),
+    isActive: true,
+    history: [],
+    currentStreak: 0,
+    longestStreak: 0,
+    completionRate: 0,
   });
 };
 
@@ -77,8 +63,8 @@ onUnmounted(() => {
 
 <template>
   <Modal :is-open="isOpen" @close="emit('close')">
-    <div class="p-6">
-      <h2 class="text-lg font-medium text-gray-900 mb-4">Edit Habit</h2>
+    <div class="p-2">
+      <h2 class="text-lg font-medium text-gray-900 mb-4">Add New Habit</h2>
       <form @submit.prevent="handleSubmit" class="space-y-4">
         <Input
           v-model="name"
@@ -108,7 +94,7 @@ onUnmounted(() => {
 
         <div class="flex justify-end gap-3">
           <Button variant="secondary" @click="emit('close')">Cancel</Button>
-          <Button variant="primary" type="submit">Save Changes</Button>
+          <Button variant="primary" type="submit">Add Habit</Button>
         </div>
       </form>
     </div>

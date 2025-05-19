@@ -14,7 +14,11 @@ const props = defineProps<{
   isExpanded: boolean;
 }>();
 
-const emit = defineEmits(["update", "delete", "toggleExpand"]);
+const emit = defineEmits<{
+  (e: "update", habit: Habit): void;
+  (e: "delete", id: number): void;
+  (e: "toggle-expand", id: number): void;
+}>();
 
 const isEditing = ref(false);
 const weekCheckIns = ref<CheckIn[]>([]);
@@ -26,22 +30,27 @@ const showHistoryModal = ref(false);
 const habitHistory = ref<CheckIn[]>([]);
 
 const frequencyOptions = [
-  { value: 1, label: "1 day per week" },
-  { value: 2, label: "2 days per week" },
-  { value: 3, label: "3 days per week" },
-  { value: 4, label: "4 days per week" },
-  { value: 5, label: "5 days per week" },
-  { value: 6, label: "6 days per week" },
-  { value: 7, label: "Daily" },
+  { value: "daily", label: "Daily" },
+  { value: "weekly", label: "Weekly" },
 ];
+
+const targetDaysNum = computed(() => Number(props.habit.targetDays) || 0);
+const frequencyNum = computed(() => {
+  const freq = props.habit.frequency;
+  if (freq === "daily") {
+    return 7;
+  }
+  if (freq === "weekly") {
+    return Number(props.habit.targetDays) || 0;
+  }
+  return 0;
+});
 
 const weekProgress = computed(() => {
   const completed = weekCheckIns.value.filter((c) => c.completed).length;
-  return {
-    completed,
-    total: props.habit.frequency,
-    percentage: Math.min(100, (completed / props.habit.frequency) * 100),
-  };
+  const total = frequencyNum.value;
+  const percentage = total > 0 ? Math.min(100, (completed / total) * 100) : 0;
+  return { completed, total, percentage };
 });
 
 const weekDays = computed(() => {
@@ -196,10 +205,10 @@ const analytics = computed(() => {
   const weeklyCompletions = weekCheckIns.value.filter(
     (c) => c.completed
   ).length;
-  const weeklyAdherence = Math.min(
-    100,
-    (weeklyCompletions / props.habit.frequency) * 100
-  );
+  const weeklyAdherence =
+    frequencyNum.value > 0
+      ? Math.min(100, (weeklyCompletions / frequencyNum.value) * 100)
+      : 0;
 
   const totalCompletions = habitHistory.value.filter((c) => c.completed).length;
   const totalDays = habitHistory.value.length;
@@ -210,7 +219,7 @@ const analytics = computed(() => {
     weekly: {
       completions: weeklyCompletions,
       adherence: Math.round(weeklyAdherence),
-      target: props.habit.frequency,
+      target: frequencyNum.value,
     },
     allTime: {
       completions: totalCompletions,
@@ -220,6 +229,25 @@ const analytics = computed(() => {
   };
 });
 
+const handleToggleActive = () => {
+  emit("update", {
+    ...props.habit,
+    isActive: !props.habit.isActive,
+  });
+};
+
+const handleDelete = () => {
+  if (props.habit.id) {
+    emit("delete", props.habit.id);
+  }
+};
+
+const handleToggleExpand = () => {
+  if (props.habit.id) {
+    emit("toggle-expand", props.habit.id);
+  }
+};
+
 onMounted(() => {
   loadWeekCheckIns();
   loadHabitHistory();
@@ -227,113 +255,137 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="bg-white rounded-lg border border-gray-200">
-    <div class="p-4">
-      <div class="flex items-start justify-between">
-        <div class="flex-1 min-w-0">
-          <div class="flex items-center gap-3">
-            <button
-              @click="emit('toggleExpand')"
-              class="flex-shrink-0 w-5 h-5 cursor-pointer">
-              <img
-                src="@/assets/icons/chevron-down.svg"
-                class="w-5 h-5 text-gray-600 transition-transform duration-200"
-                :class="{ 'transform rotate-180': isExpanded }"
-                alt="Toggle expand" />
-            </button>
-            <h3 class="text-lg font-medium text-gray-900 truncate">
-              {{ habit.name }}
-            </h3>
-          </div>
-          <div class="mt-1 flex items-center space-x-4">
-            <p class="text-sm text-gray-500">
-              {{
-                frequencyOptions.find((opt) => opt.value === habit.frequency)
-                  ?.label
-              }}
-            </p>
-            <button
-              @click="showStreakModal = true"
-              class="text-sm text-gray-500 hover:text-gray-700 transition-colors">
-              <span class="font-medium text-gray-900">{{ currentStreak }}</span>
-              day streak
-            </button>
-          </div>
-        </div>
-        <div class="flex items-center space-x-2 ml-4">
-          <Button
-            variant="secondary"
-            size="sm"
-            title="Edit habit"
-            @click="isEditing = true">
-            <img src="@/assets/icons/edit.svg" class="h-4 w-4" alt="Edit" />
-          </Button>
-          <Button
-            variant="danger"
-            size="sm"
-            title="Delete habit"
-            @click="emit('delete', habit.id)">
-            <img src="@/assets/icons/trash.svg" class="h-4 w-4" alt="Delete" />
-          </Button>
-        </div>
-      </div>
-
-      <div class="mt-4 space-y-1">
-        <div class="flex justify-between text-sm">
-          <span class="text-gray-600">Weekly Progress</span>
-          <span class="text-gray-900 font-medium"
-            >{{ weekProgress.completed }}/{{ weekProgress.total }}</span
+  <div class="border rounded-lg p-4 mb-4">
+    <div class="flex flex-col sm:flex-row justify-between items-start gap-4">
+      <div class="w-full">
+        <h3 class="text-lg font-medium text-gray-900">{{ habit.name }}</h3>
+        <p v-if="habit.description" class="text-sm text-gray-500 mt-1">
+          {{ habit.description }}
+        </p>
+        <div
+          class="flex flex-wrap items-center gap-2 text-sm text-gray-500 mt-2">
+          <span class="capitalize">{{ habit.frequency }}</span>
+          <span>•</span>
+          <span
+            >{{ habit.targetDays }}
+            {{
+              habit.frequency === "daily"
+                ? "days"
+                : habit.frequency === "weekly"
+                ? "weeks"
+                : "months"
+            }}</span
           >
-        </div>
-        <div class="h-2 bg-gray-100 rounded-full overflow-hidden">
-          <div
-            class="h-full bg-gray-800 transition-all duration-300"
-            :style="{ width: `${weekProgress.percentage}%` }"></div>
+          <span>•</span>
+          <span>{{ currentStreak }} day streak</span>
         </div>
       </div>
-
-      <div v-if="isExpanded" class="mt-4">
-        <Calendar
-          :check-ins="weekCheckIns"
-          :start-date="weekStart"
-          :end-date="weekEnd"
-          :show-week-days="true"
-          view="week"
-          :is-editable="true"
-          @toggle="toggleDay" />
+      <div class="flex items-center gap-2">
+        <Button
+          variant="secondary"
+          class="p-2"
+          :title="isExpanded ? 'Show Less' : 'Show More'"
+          @click="handleToggleExpand">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            class="h-5 w-5 transition-transform duration-200"
+            :class="{ 'rotate-180': isExpanded }"
+            viewBox="0 0 20 20"
+            fill="currentColor">
+            <path
+              fill-rule="evenodd"
+              d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
+              clip-rule="evenodd" />
+          </svg>
+        </Button>
+        <Button
+          variant="secondary"
+          class="p-2"
+          title="Edit Habit"
+          @click="isEditing = true">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            class="h-5 w-5"
+            viewBox="0 0 20 20"
+            fill="currentColor">
+            <path
+              d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
+          </svg>
+        </Button>
+        <Button
+          variant="danger"
+          class="p-2"
+          title="Delete Habit"
+          @click="handleDelete">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            class="h-5 w-5"
+            viewBox="0 0 20 20"
+            fill="currentColor">
+            <path
+              fill-rule="evenodd"
+              d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z"
+              clip-rule="evenodd" />
+          </svg>
+        </Button>
       </div>
     </div>
 
-    <CompletionModal
-      :is-open="showCompletionModal"
-      @close="showCompletionModal = false" />
-
-    <StreakModal
-      :is-open="showStreakModal"
-      :current-streak="currentStreak"
-      :longest-streak="longestStreak"
-      @close="showStreakModal = false" />
-
-    <div class="mt-4 flex justify-end">
-      <Button
-        variant="secondary"
-        size="sm"
-        title="View History"
-        @click="showHistoryModal = true">
-        View History
-      </Button>
+    <div class="mt-4 space-y-1">
+      <div class="flex justify-between text-sm">
+        <span class="text-gray-600">Weekly Progress</span>
+        <span class="text-gray-900 font-medium"
+          >{{ weekProgress.completed }}/{{ weekProgress.total }}</span
+        >
+      </div>
+      <div class="h-2 bg-gray-100 rounded-full overflow-hidden">
+        <div
+          class="h-full bg-gray-800 transition-all duration-300"
+          :style="{ width: `${weekProgress.percentage}%` }"></div>
+      </div>
     </div>
 
-    <HistoryModal
-      :is-open="showHistoryModal"
-      :habit-history="habitHistory"
-      :analytics="analytics"
-      @close="showHistoryModal = false" />
-
-    <EditHabitModal
-      :is-open="isEditing"
-      :habit="habit"
-      @close="isEditing = false"
-      @save="save" />
+    <div v-if="isExpanded" class="mt-4">
+      <Calendar
+        :check-ins="weekCheckIns"
+        :start-date="weekStart"
+        :end-date="weekEnd"
+        :show-week-days="true"
+        view="week"
+        :is-editable="true"
+        @toggle="toggleDay" />
+    </div>
   </div>
+
+  <CompletionModal
+    :is-open="showCompletionModal"
+    @close="showCompletionModal = false" />
+
+  <StreakModal
+    :is-open="showStreakModal"
+    :current-streak="currentStreak"
+    :longest-streak="longestStreak"
+    @close="showStreakModal = false" />
+
+  <div class="mt-4 flex justify-end">
+    <Button
+      variant="secondary"
+      size="sm"
+      title="View History"
+      @click="showHistoryModal = true">
+      View History
+    </Button>
+  </div>
+
+  <HistoryModal
+    :is-open="showHistoryModal"
+    :habit-history="habitHistory"
+    :analytics="analytics"
+    @close="showHistoryModal = false" />
+
+  <EditHabitModal
+    :is-open="isEditing"
+    :habit="habit"
+    @close="isEditing = false"
+    @save="save" />
 </template>

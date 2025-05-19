@@ -29,7 +29,7 @@ const emit = defineEmits(["update:modelValue"]);
         'w-full p-2 border rounded-md text-base transition-colors',
         error
           ? 'border-red-300 focus:border-red-500 focus:ring-red-500'
-          : 'border-gray-300 focus:border-blue-500 focus:ring-blue-500',
+          : 'focus:outline-none',
       ]" />
     <p v-if="error" class="text-sm text-red-600">{{ error }}</p>
   </div>

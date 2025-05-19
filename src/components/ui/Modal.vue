@@ -39,7 +39,7 @@ onUnmounted(() => {
         class="modal-overlay fixed inset-0 bg-black/10 bg-opacity-25 transition-opacity" />
 
       <div
-        class="relative transform overflow-hidden rounded-lg bg-white p-6 text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-lg">
+        class="relative transform overflow-hidden rounded-lg bg-white p-4 text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-lg">
         <div v-if="title" class="mb-4">
           <h3 class="text-lg font-medium leading-6 text-gray-900">
             {{ title }}
