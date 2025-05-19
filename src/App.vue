@@ -238,7 +238,14 @@ onMounted(loadHabits);
                 habitHistory.length) *
                 100
             ) || 0,
-          target: editingHabit.targetDays,
+          target:
+            Math.ceil(
+              Math.abs(
+                new Date(editingHabit.endDate).getTime() -
+                  new Date(editingHabit.startDate).getTime()
+              ) /
+                (1000 * 60 * 60 * 24)
+            ) + 1,
         },
         allTime: {
           completions: habitHistory.filter((h) => h.completed).length,

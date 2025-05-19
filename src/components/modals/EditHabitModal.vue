@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch, onMounted, onUnmounted } from "vue";
+import { ref, watch, onMounted, onUnmounted, computed } from "vue";
 import type { Habit } from "@/services/db";
 import Input from "../ui/Input.vue";
 import Select from "../ui/Select.vue";
@@ -18,14 +18,10 @@ const emit = defineEmits<{
 
 const name = ref("");
 const description = ref("");
-const frequency = ref<"daily" | "weekly" | "monthly">("daily");
-const targetDays = ref("1");
+const startDate = ref("");
+const endDate = ref("");
 
-const frequencyOptions = [
-  { value: "daily" as const, label: "Daily" },
-  { value: "weekly" as const, label: "Weekly" },
-  { value: "monthly" as const, label: "Monthly" },
-];
+const minEndDate = computed(() => startDate.value || "");
 
 watch(
   () => props.habit,
@@ -33,22 +29,30 @@ watch(
     if (newHabit) {
       name.value = newHabit.name;
       description.value = newHabit.description || "";
-      frequency.value = newHabit.frequency;
-      targetDays.value = String(newHabit.targetDays);
+      startDate.value = newHabit.startDate.toISOString().split("T")[0];
+      endDate.value = newHabit.endDate.toISOString().split("T")[0];
     }
   },
   { immediate: true }
 );
 
 const handleSubmit = () => {
-  if (!name.value.trim()) return;
+  if (!name.value.trim() || !startDate.value || !endDate.value) return;
+
+  const start = new Date(startDate.value);
+  const end = new Date(endDate.value);
+
+  if (end < start) {
+    alert("End date must be after start date");
+    return;
+  }
 
   emit("save", {
     ...props.habit,
     name: name.value.trim(),
     description: description.value.trim(),
-    frequency: frequency.value,
-    targetDays: Number(targetDays.value),
+    startDate: start,
+    endDate: end,
     history: props.habit.history.map((h) => ({
       ...h,
       date: new Date(h.date),
@@ -92,18 +96,13 @@ onUnmounted(() => {
           placeholder="Enter habit description"
           type="textarea" />
 
-        <Select
-          v-model="frequency"
-          :options="frequencyOptions"
-          label="Frequency"
-          required />
+        <Input v-model="startDate" label="Start Date" type="date" required />
 
         <Input
-          v-model="targetDays"
-          label="Target Days"
-          type="number"
-          min="1"
-          :max="frequency === 'daily' ? 7 : frequency === 'weekly' ? 7 : 31"
+          v-model="endDate"
+          label="End Date"
+          type="date"
+          :min="minEndDate"
           required />
 
         <div class="flex justify-end gap-3">

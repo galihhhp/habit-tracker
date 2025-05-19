@@ -4,8 +4,8 @@ export interface Habit {
   id?: number;
   name: string;
   description: string;
-  targetDays: number;
-  frequency: "daily" | "weekly" | "monthly";
+  startDate: Date;
+  endDate: Date;
   isActive: boolean;
   currentStreak: number;
   longestStreak: number;

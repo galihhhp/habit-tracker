@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from "vue";
 import type { Habit, CheckIn } from "../services/db";
+import type { Achievement } from "@/services/achievements";
 import { checkInService } from "../services/db";
+import { checkAchievements, getTotalPoints } from "@/services/achievements";
 import Button from "./ui/Button.vue";
 import Calendar from "./ui/Calendar.vue";
 import CompletionModal from "./modals/CompletionModal.vue";
@@ -9,6 +11,7 @@ import StreakModal from "./modals/StreakModal.vue";
 import HistoryModal from "./modals/HistoryModal.vue";
 import EditHabitModal from "./modals/EditHabitModal.vue";
 import DropdownMenu from "./ui/DropdownMenu.vue";
+import AchievementsModal from "./modals/AchievementsModal.vue";
 
 const props = defineProps<{
   habit: Habit;
@@ -31,23 +34,22 @@ const currentStreak = ref(0);
 const longestStreak = ref(0);
 const showHistoryModal = ref(false);
 const habitHistory = ref<CheckIn[]>([]);
+const showAchievementsModal = ref(false);
+const newAchievements = ref<Achievement[]>([]);
 
 const frequencyOptions = [
   { value: "daily", label: "Daily" },
   { value: "weekly", label: "Weekly" },
 ];
 
-const targetDaysNum = computed(() => Number(props.habit.targetDays) || 0);
-const frequencyNum = computed(() => {
-  const freq = props.habit.frequency;
-  if (freq === "daily") {
-    return 7;
-  }
-  if (freq === "weekly") {
-    return Number(props.habit.targetDays) || 0;
-  }
-  return 0;
+const targetDaysNum = computed(() => {
+  const start = new Date(props.habit.startDate);
+  const end = new Date(props.habit.endDate);
+  const diffTime = Math.abs(end.getTime() - start.getTime());
+  return Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
 });
+
+const frequencyNum = computed(() => targetDaysNum.value);
 
 const weekProgress = computed(() => {
   const completed = weekCheckIns.value.filter((c) => c.completed).length;
@@ -176,11 +178,26 @@ const toggleDay = async (date: Date) => {
     return checkInDate.getTime() === date.getTime();
   })?.completed;
 
-  if (!isCompleted) {
+  if (isCompleted) {
     showCompletionModal.value = true;
 
     if (currentStreak.value > 0 && currentStreak.value % 7 === 0) {
       showStreakModal.value = true;
+    }
+
+    const totalCompletions = habitHistory.value.filter(
+      (c) => c.completed
+    ).length;
+
+    const achievements = await checkAchievements(
+      props.habit.id,
+      currentStreak.value,
+      totalCompletions
+    );
+
+    if (achievements.length > 0) {
+      newAchievements.value = achievements;
+      showAchievementsModal.value = true;
     }
   }
 };
@@ -259,6 +276,10 @@ const handleViewHistory = () => {
   showHistoryModal.value = true;
 };
 
+const points = computed(() => {
+  return props.habit.id ? getTotalPoints(props.habit.id) : 0;
+});
+
 onMounted(() => {
   loadWeekCheckIns();
   loadHabitHistory();
@@ -267,7 +288,7 @@ onMounted(() => {
 
 <template>
   <div class="border rounded-lg p-4 mb-4">
-    <div class="flex flex-col sm:flex-row justify-between items-start gap-4">
+    <div class="flex justify-between items-start gap-4">
       <div class="w-full">
         <h3 class="text-lg font-medium text-gray-900">{{ habit.name }}</h3>
         <p v-if="habit.description" class="text-sm text-gray-500 mt-1">
@@ -275,26 +296,26 @@ onMounted(() => {
         </p>
         <div
           class="flex flex-wrap items-center gap-2 text-sm text-gray-500 mt-2">
-          <span class="capitalize">{{ habit.frequency }}</span>
+          <span>{{ new Date(habit.startDate).toLocaleDateString() }}</span>
+          <span>-</span>
+          <span>{{ new Date(habit.endDate).toLocaleDateString() }}</span>
           <span>•</span>
-          <span
-            >{{ habit.targetDays }}
-            {{
-              habit.frequency === "daily"
-                ? "days"
-                : habit.frequency === "weekly"
-                ? "weeks"
-                : "months"
-            }}</span
-          >
+          <span>{{ targetDaysNum }} days</span>
           <span>•</span>
           <span>{{ currentStreak }} day streak</span>
+          <span>•</span>
+          <Button
+            size="sm"
+            variant="secondary"
+            @click="showAchievementsModal = true"
+            >🏆 {{ points }} pts
+          </Button>
         </div>
       </div>
       <div class="flex items-center gap-2">
         <Button
-          variant="secondary"
-          class="p-2"
+          variant="white"
+          size="none"
           :title="isExpanded ? 'Show Less' : 'Show More'"
           @click="handleToggleExpand">
           <svg
@@ -411,4 +432,10 @@ onMounted(() => {
     :habit="habit"
     @close="isEditing = false"
     @save="save" />
+
+  <AchievementsModal
+    :is-open="showAchievementsModal"
+    :achievements="newAchievements"
+    :habit-id="habit.id!"
+    @close="showAchievementsModal = false" />
 </template>
