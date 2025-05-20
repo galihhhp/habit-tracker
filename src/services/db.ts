@@ -38,11 +38,24 @@ export interface CheckIn {
   createdAt: Date;
 }
 
+export interface EarnedAchievement {
+  id?: number;
+  habitId: number;
+  achievementId: string;
+  earnedAt: Date;
+}
+
 const createDatabase = () => {
   const db = new Dexie("HabitTrackerDB");
-  db.version(1).stores({
+
+  db.version(3).stores({
     habits: "++id, name, isActive, currentStreak, completionRate",
     checkIns: "++id, habitId, date, [habitId+date]",
+    achievements: "++id, habitId, achievementId, [habitId+achievementId]",
+  });
+
+  db.on('versionchange', function (event) {
+    window.location.reload();
   });
 
   return db;
@@ -100,16 +113,21 @@ export const habitService = {
       isActive: habit.isActive,
       frequency: {
         times: Number(habit.frequency.times),
-        period: habit.frequency.period
+        period: habit.frequency.period,
       },
       history: (habit.history || []).map(
         (h: { date: Date | string; completed: boolean }) => ({
-          date: h.date instanceof Date ? h.date.toISOString() : new Date(h.date).toISOString(),
-          completed: !!h.completed
+          date:
+            h.date instanceof Date
+              ? h.date.toISOString()
+              : new Date(h.date).toISOString(),
+          completed: !!h.completed,
         })
       ),
       completionRate: habit.completionRate || 0,
-      predictions: habit.predictions ? JSON.parse(JSON.stringify(habit.predictions)) : undefined
+      predictions: habit.predictions
+        ? JSON.parse(JSON.stringify(habit.predictions))
+        : undefined,
     };
     return await db.table("habits").add(newHabit);
   },
@@ -133,7 +151,7 @@ export const habitService = {
       updateData.history = updateData.history.map(
         (h: { date: Date | string; completed: boolean }) => ({
           date: h.date instanceof Date ? h.date.toISOString() : h.date,
-          completed: !!h.completed
+          completed: !!h.completed,
         })
       );
     }
@@ -141,12 +159,14 @@ export const habitService = {
     if (updateData.frequency) {
       updateData.frequency = {
         times: Number(updateData.frequency.times),
-        period: updateData.frequency.period
+        period: updateData.frequency.period,
       };
     }
 
     if (updateData.predictions) {
-      updateData.predictions = JSON.parse(JSON.stringify(updateData.predictions));
+      updateData.predictions = JSON.parse(
+        JSON.stringify(updateData.predictions)
+      );
     }
 
     return await db.table("habits").update(id, updateData);
@@ -154,6 +174,7 @@ export const habitService = {
 
   delete: async (id: number) => {
     await db.table("checkIns").where("habitId").equals(id).delete();
+    await db.table("achievements").where("habitId").equals(id).delete();
     return await db.table("habits").delete(id);
   },
 };
@@ -209,6 +230,55 @@ export const checkInService = {
         completed: true,
         createdAt: new Date(),
       });
+    }
+  },
+};
+
+export const achievementService = {
+  getAllForHabit: async (habitId: number) => {
+    try {
+      if (!db.tables.some((table) => table.name === "achievements")) {
+        return [];
+      }
+
+      const achievements = await db
+        .table("achievements")
+        .where("habitId")
+        .equals(habitId)
+        .toArray();
+
+      return achievements.map((achievement) => ({
+        ...achievement,
+        earnedAt: new Date(achievement.earnedAt),
+      }));
+    } catch (error) {
+      return [];
+    }
+  },
+
+  saveAchievement: async (habitId: number, achievementId: string) => {
+    try {
+      if (!db.tables.some((table) => table.name === "achievements")) {
+        return null;
+      }
+
+      const existing = await db
+        .table("achievements")
+        .where(["habitId", "achievementId"])
+        .equals([habitId, achievementId])
+        .first();
+
+      if (!existing) {
+        return await db.table("achievements").add({
+          habitId,
+          achievementId,
+          earnedAt: new Date(),
+        });
+      }
+
+      return existing.id;
+    } catch (error) {
+      return null;
     }
   },
 };

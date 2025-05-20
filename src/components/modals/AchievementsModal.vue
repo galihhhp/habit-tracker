@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { defineProps, defineEmits, computed } from "vue";
+import { defineProps, defineEmits, computed, ref, onMounted, watch } from "vue";
 import type { Achievement } from "@/services/achievements";
 import { getEarnedAchievements, getTotalPoints } from "@/services/achievements";
 import Modal from "../ui/Modal.vue";
@@ -15,12 +15,29 @@ const emit = defineEmits<{
   (e: "close"): void;
 }>();
 
-const earnedAchievements = computed(() => {
-  return props.habitId ? getEarnedAchievements(props.habitId) : [];
-});
+const earnedAchievements = ref<Achievement[]>([]);
+const totalPoints = ref(0);
 
-const totalPoints = computed(() => {
-  return props.habitId ? getTotalPoints(props.habitId) : 0;
+const loadAchievements = async () => {
+  if (props.habitId) {
+    earnedAchievements.value = await getEarnedAchievements(props.habitId);
+    totalPoints.value = await getTotalPoints(props.habitId);
+  }
+};
+
+watch(
+  () => props.isOpen,
+  async (isOpen) => {
+    if (isOpen) {
+      await loadAchievements();
+    }
+  }
+);
+
+onMounted(async () => {
+  if (props.isOpen) {
+    await loadAchievements();
+  }
 });
 
 const badges = [

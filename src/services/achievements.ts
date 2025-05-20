@@ -1,4 +1,5 @@
-import { ref } from "vue";
+import { ref, reactive } from "vue";
+import { achievementService } from "./db";
 
 export type Achievement = {
   id: string;
@@ -94,55 +95,90 @@ const achievements: Achievement[] = [
   },
 ];
 
-const earnedAchievements = ref<Map<number, Set<string>>>(new Map());
+const earnedAchievementsCache = reactive(new Map<number, Set<string>>());
+
+const loadEarnedAchievements = async (habitId: number) => {
+  try {
+    if (!earnedAchievementsCache.has(habitId)) {
+      earnedAchievementsCache.set(habitId, new Set<string>());
+    }
+
+    const storedAchievements = await achievementService.getAllForHabit(habitId);
+    const cachedSet = earnedAchievementsCache.get(habitId)!;
+
+    storedAchievements.forEach((achievement) => {
+      cachedSet.add(achievement.achievementId);
+    });
+
+    return cachedSet;
+  } catch (error) {
+    return new Set<string>();
+  }
+};
 
 export const checkAchievements = async (
   habitId: number,
   currentStreak: number,
   totalCompletions: number
 ) => {
-  const earned = earnedAchievements.value.get(habitId) || new Set<string>();
-  const newAchievements: Achievement[] = [];
+  try {
+    const earned = await loadEarnedAchievements(habitId);
+    const newAchievements: Achievement[] = [];
 
-  achievements.forEach((achievement) => {
-    if (earned.has(achievement.id)) return;
+    const checkAndSaveAchievement = async (
+      achievement: Achievement,
+      condition: boolean
+    ) => {
+      if (earned.has(achievement.id) || !condition) return;
 
-    if (
-      achievement.type === "streak" &&
-      currentStreak >= achievement.requirement
-    ) {
       earned.add(achievement.id);
       newAchievements.push(achievement);
+      try {
+        await achievementService.saveAchievement(habitId, achievement.id);
+      } catch (error) {
+        console.log(achievement.id, error);
+      }
+    };
+
+    for (const achievement of achievements) {
+      if (achievement.type === "streak") {
+        await checkAndSaveAchievement(
+          achievement,
+          currentStreak >= achievement.requirement
+        );
+      } else if (achievement.type === "completion") {
+        await checkAndSaveAchievement(
+          achievement,
+          totalCompletions >= achievement.requirement
+        );
+      } else if (
+        achievement.type === "milestone" &&
+        achievement.id === "first_checkin"
+      ) {
+        await checkAndSaveAchievement(achievement, totalCompletions === 1);
+      }
     }
 
-    if (
-      achievement.type === "completion" &&
-      totalCompletions >= achievement.requirement
-    ) {
-      earned.add(achievement.id);
-      newAchievements.push(achievement);
-    }
-
-    if (
-      achievement.type === "milestone" &&
-      achievement.id === "first_checkin" &&
-      totalCompletions === 1
-    ) {
-      earned.add(achievement.id);
-      newAchievements.push(achievement);
-    }
-  });
-
-  earnedAchievements.value.set(habitId, earned);
-  return newAchievements;
+    return newAchievements;
+  } catch (error) {
+    return [];
+  }
 };
 
-export const getEarnedAchievements = (habitId: number) => {
-  const earned = earnedAchievements.value.get(habitId) || new Set<string>();
-  return achievements.filter((a) => earned.has(a.id));
+export const getEarnedAchievements = async (habitId: number) => {
+  try {
+    const earned = await loadEarnedAchievements(habitId);
+    return achievements.filter((a) => earned.has(a.id));
+  } catch (error) {
+    return [];
+  }
 };
 
-export const getTotalPoints = (habitId: number) => {
-  const earned = getEarnedAchievements(habitId);
-  return earned.reduce((total, achievement) => total + achievement.points, 0);
+export const getTotalPoints = async (habitId: number) => {
+  try {
+    const earned = await getEarnedAchievements(habitId);
+    return earned.reduce((total, achievement) => total + achievement.points, 0);
+  } catch (error) {
+    return 0;
+  }
 };

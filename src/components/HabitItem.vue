@@ -36,11 +36,7 @@ const predictions = ref<{
   targetPrediction: string;
 } | null>(null);
 const isGeneratingPredictions = ref(false);
-
-const frequencyOptions = [
-  { value: "daily", label: "Daily" },
-  { value: "weekly", label: "Weekly" },
-];
+const totalPoints = ref(0);
 
 const targetDaysNum = computed(() => {
   const start = new Date(props.habit.startDate);
@@ -202,25 +198,20 @@ const toggleDay = async (date: Date) => {
       newAchievements.value = achievements;
       showAchievementsModal.value = true;
     }
+
+    await loadPoints();
+  }
+};
+
+const loadPoints = async () => {
+  if (props.habit.id) {
+    totalPoints.value = await getTotalPoints(props.habit.id);
   }
 };
 
 const save = (updatedHabit: Habit) => {
   emit("update", updatedHabit);
   isEditing.value = false;
-};
-
-const ensureFrequency = () => {
-  if (!props.habit.frequency) {
-    const updatedHabit = {
-      ...props.habit,
-      frequency: {
-        times: 1,
-        period: "week",
-      },
-    };
-    emit("update", updatedHabit);
-  }
 };
 
 const loadHabitHistory = async () => {
@@ -265,13 +256,6 @@ const analytics = computed(() => {
   };
 });
 
-const handleToggleActive = () => {
-  emit("update", {
-    ...props.habit,
-    isActive: !props.habit.isActive,
-  });
-};
-
 const handleDelete = () => {
   if (props.habit.id) {
     emit("delete", props.habit.id);
@@ -285,10 +269,6 @@ const handleEdit = () => {
 const handleViewHistory = () => {
   showHistoryModal.value = true;
 };
-
-const points = computed(() => {
-  return props.habit.id ? getTotalPoints(props.habit.id) : 0;
-});
 
 const generatePredictions = async () => {
   if (!props.habit.id || isGeneratingPredictions.value) return;
@@ -335,7 +315,7 @@ const generatePredictions = async () => {
   }
 };
 
-onMounted(() => {
+onMounted(async () => {
   if (!props.habit.frequency) {
     const updatedHabit = {
       ...props.habit,
@@ -346,8 +326,9 @@ onMounted(() => {
     };
     emit("update", updatedHabit);
   }
-  loadWeekCheckIns();
-  loadHabitHistory();
+  await loadWeekCheckIns();
+  await loadHabitHistory();
+  await loadPoints();
 });
 </script>
 
@@ -375,7 +356,7 @@ onMounted(() => {
             size="sm"
             variant="secondary"
             @click="showAchievementsModal = true"
-            >🏆 {{ points }} pts
+            >🏆 {{ totalPoints }} pts
           </Button>
           <Button
             v-if="!habit.predictions"
