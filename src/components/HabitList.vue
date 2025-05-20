@@ -11,12 +11,6 @@ const emit = defineEmits<{
   (e: "update", habit: Habit): void;
   (e: "delete", id: number): void;
 }>();
-
-const expandedHabitId = ref<number | null>(null);
-
-const toggleExpand = (id: number) => {
-  expandedHabitId.value = expandedHabitId.value === id ? null : id;
-};
 </script>
 
 <template>
@@ -31,8 +25,6 @@ const toggleExpand = (id: number) => {
         v-for="habit in props.habits"
         :key="habit.id"
         :habit="habit"
-        :is-expanded="expandedHabitId === habit.id"
-        @toggle-expand="toggleExpand(habit.id!)"
         @update="emit('update', $event)"
         @delete="emit('delete', $event)" />
     </div>

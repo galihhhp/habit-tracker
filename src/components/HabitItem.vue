@@ -17,16 +17,9 @@ import HabitPredictions from "./predictions/HabitPredictions.vue";
 
 const props = defineProps<{
   habit: Habit;
-  isExpanded: boolean;
 }>();
 
-const emit = defineEmits<{
-  (e: "update", habit: Habit): void;
-  (e: "delete", id: number): void;
-  (e: "toggle-expand", id: number): void;
-  (e: "edit", habit: Habit): void;
-  (e: "viewHistory", habit: Habit): void;
-}>();
+const emit = defineEmits(["update", "delete"]);
 
 const isEditing = ref(false);
 const weekCheckIns = ref<CheckIn[]>([]);
@@ -56,7 +49,9 @@ const targetDaysNum = computed(() => {
   return Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
 });
 
-const frequencyNum = computed(() => targetDaysNum.value);
+const frequencyNum = computed(() => {
+  return props.habit.frequency?.times ? Number(props.habit.frequency.times) : 1;
+});
 
 const weekProgress = computed(() => {
   const completed = weekCheckIns.value.filter((c) => c.completed).length;
@@ -215,6 +210,19 @@ const save = (updatedHabit: Habit) => {
   isEditing.value = false;
 };
 
+const ensureFrequency = () => {
+  if (!props.habit.frequency) {
+    const updatedHabit = {
+      ...props.habit,
+      frequency: {
+        times: 1,
+        period: "week",
+      },
+    };
+    emit("update", updatedHabit);
+  }
+};
+
 const loadHabitHistory = async () => {
   if (!props.habit.id) return;
 
@@ -267,12 +275,6 @@ const handleToggleActive = () => {
 const handleDelete = () => {
   if (props.habit.id) {
     emit("delete", props.habit.id);
-  }
-};
-
-const handleToggleExpand = () => {
-  if (props.habit.id) {
-    emit("toggle-expand", props.habit.id);
   }
 };
 
@@ -334,6 +336,16 @@ const generatePredictions = async () => {
 };
 
 onMounted(() => {
+  if (!props.habit.frequency) {
+    const updatedHabit = {
+      ...props.habit,
+      frequency: {
+        times: 1,
+        period: "week",
+      },
+    };
+    emit("update", updatedHabit);
+  }
   loadWeekCheckIns();
   loadHabitHistory();
 });
@@ -354,6 +366,8 @@ onMounted(() => {
           <span>{{ new Date(habit.endDate).toLocaleDateString() }}</span>
           <span>•</span>
           <span>{{ targetDaysNum }} days</span>
+          <span>•</span>
+          <span>{{ habit.frequency?.times || 1 }} times per week</span>
           <span>•</span>
           <span>{{ currentStreak }} day streak</span>
           <span>•</span>
@@ -379,23 +393,6 @@ onMounted(() => {
         </div>
       </div>
       <div class="flex items-center gap-2">
-        <Button
-          variant="white"
-          size="none"
-          :title="isExpanded ? 'Show Less' : 'Show More'"
-          @click="handleToggleExpand">
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            class="h-5 w-5 transition-transform duration-200"
-            :class="{ 'rotate-180': isExpanded }"
-            viewBox="0 0 20 20"
-            fill="currentColor">
-            <path
-              fill-rule="evenodd"
-              d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
-              clip-rule="evenodd" />
-          </svg>
-        </Button>
         <DropdownMenu>
           <template #default>
             <div class="py-1">
@@ -465,7 +462,7 @@ onMounted(() => {
       </div>
     </div>
 
-    <div v-if="isExpanded" class="mt-4 space-y-6">
+    <div class="mt-4 space-y-6">
       <Calendar
         :check-ins="weekCheckIns"
         :start-date="weekStart"

@@ -49,7 +49,7 @@ const isAtLimit = computed(() => {
       "
       :rows="rows || 3"
       :maxlength="maxLength"
-      class="w-full p-2 rounded-md border-gray-300 shadow-sm focus:border-gray-800 focus:ring-gray-800"
+      class="w-full p-2 rounded-md border shadow-sm focus:border-gray-800 focus:ring-gray-800"
       :class="{
         'border-red-300 focus:border-red-500 focus:ring-red-500': error,
         'border-yellow-300 focus:border-yellow-500':

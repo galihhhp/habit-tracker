@@ -9,6 +9,10 @@ export interface Habit {
   createdAt: Date | string;
   updatedAt: Date | string;
   isActive: boolean;
+  frequency: {
+    times: number;
+    period: "week";
+  };
   history: Array<{
     date: Date | string;
     completed: boolean;
@@ -20,6 +24,9 @@ export interface Habit {
       prediction: string;
     }>;
     targetPrediction: string;
+    dailyPrediction?: string;
+    frequencyPrediction?: string;
+    overexertionWarning?: string;
   };
 }
 
@@ -49,7 +56,7 @@ const checkInactivity = (habit: Habit): boolean => {
 
   const daysSinceLastCheckIn = Math.floor(
     (new Date().getTime() - new Date(lastCheckIn.date).getTime()) /
-      (1000 * 60 * 60 * 24)
+    (1000 * 60 * 60 * 24)
   );
 
   return daysSinceLastCheckIn >= 14;
@@ -84,18 +91,25 @@ export const habitService = {
   add: async (habit: Omit<Habit, "id" | "createdAt" | "updatedAt">) => {
     const timestamp = new Date();
     const newHabit = {
-      ...habit,
+      name: habit.name,
+      description: habit.description || "",
       startDate: new Date(habit.startDate).toISOString(),
       endDate: new Date(habit.endDate).toISOString(),
       createdAt: timestamp.toISOString(),
       updatedAt: timestamp.toISOString(),
-      history: habit.history.map(
+      isActive: habit.isActive,
+      frequency: {
+        times: Number(habit.frequency.times),
+        period: habit.frequency.period
+      },
+      history: (habit.history || []).map(
         (h: { date: Date | string; completed: boolean }) => ({
-          ...h,
-          date: new Date(h.date).toISOString(),
+          date: h.date instanceof Date ? h.date.toISOString() : new Date(h.date).toISOString(),
+          completed: !!h.completed
         })
       ),
-      completionRate: 0,
+      completionRate: habit.completionRate || 0,
+      predictions: habit.predictions ? JSON.parse(JSON.stringify(habit.predictions)) : undefined
     };
     return await db.table("habits").add(newHabit);
   },
@@ -118,10 +132,21 @@ export const habitService = {
     if (updateData.history) {
       updateData.history = updateData.history.map(
         (h: { date: Date | string; completed: boolean }) => ({
-          ...h,
           date: h.date instanceof Date ? h.date.toISOString() : h.date,
+          completed: !!h.completed
         })
       );
+    }
+
+    if (updateData.frequency) {
+      updateData.frequency = {
+        times: Number(updateData.frequency.times),
+        period: updateData.frequency.period
+      };
+    }
+
+    if (updateData.predictions) {
+      updateData.predictions = JSON.parse(JSON.stringify(updateData.predictions));
     }
 
     return await db.table("habits").update(id, updateData);

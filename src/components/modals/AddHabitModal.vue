@@ -5,8 +5,14 @@ import Input from "../ui/Input.vue";
 import Button from "../ui/Button.vue";
 import Modal from "../ui/Modal.vue";
 import TextArea from "../ui/TextArea.vue";
+import FrequencyInput from "../ui/FrequencyInput.vue";
 import { aiService } from "@/services/ai";
 import { habitSchema } from "@/schemas/habit";
+
+interface Frequency {
+  times: number;
+  period: "week";
+}
 
 const props = defineProps<{
   isOpen: boolean;
@@ -24,6 +30,7 @@ const formErrors = reactive({
   description: "",
   startDate: "",
   endDate: "",
+  frequency: "",
 });
 
 const formData = reactive({
@@ -31,6 +38,10 @@ const formData = reactive({
   description: "",
   startDate: "",
   endDate: "",
+  frequency: {
+    times: 1,
+    period: "week" as const,
+  },
 });
 
 const clearErrors = () => {
@@ -38,6 +49,7 @@ const clearErrors = () => {
   formErrors.description = "";
   formErrors.startDate = "";
   formErrors.endDate = "";
+  formErrors.frequency = "";
 };
 
 const resetForm = () => {
@@ -45,6 +57,10 @@ const resetForm = () => {
   formData.description = "";
   formData.startDate = "";
   formData.endDate = "";
+  formData.frequency = {
+    times: 1,
+    period: "week" as const,
+  };
   clearErrors();
 };
 
@@ -119,6 +135,10 @@ const onSubmit = () => {
     description: formData.description,
     startDate: start,
     endDate: end,
+    frequency: {
+      times: Number(formData.frequency.times),
+      period: formData.frequency.period,
+    },
     isActive: true,
     history: [],
     completionRate: 0,
@@ -179,6 +199,10 @@ onUnmounted(() => {
           :maxLength="250"
           placeholder="Describe your habit (required, max 250 characters)"
           :error="getFieldError('description')" />
+
+        <FrequencyInput
+          v-model="formData.frequency"
+          :error="getFieldError('frequency')" />
 
         <Input
           v-model="formData.startDate"

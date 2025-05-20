@@ -33,9 +33,7 @@ const emit = defineEmits(["update:modelValue"]);
       :disabled="loading"
       :class="[
         'w-full p-2 border rounded-md text-base transition-colors',
-        error
-          ? 'border-red-300 focus:border-red-500 focus:ring-red-500'
-          : 'border-gray-300 focus:border-gray-500 focus:ring-gray-500',
+        error ? 'border-red-300 focus:border-red-500 focus:ring-red-500' : '',
         loading ? 'bg-gray-50' : '',
       ]" />
     <p v-if="error" class="text-sm text-red-600">{{ error }}</p>

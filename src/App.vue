@@ -44,7 +44,21 @@ const loadHabits = async () => {
 const handleSaveHabit = async (
   habit: Omit<Habit, "id" | "createdAt" | "updatedAt">
 ) => {
-  await habitService.add(habit);
+  const serializedHabit = {
+    ...habit,
+    startDate:
+      habit.startDate instanceof Date
+        ? habit.startDate
+        : new Date(habit.startDate),
+    endDate:
+      habit.endDate instanceof Date ? habit.endDate : new Date(habit.endDate),
+    frequency: {
+      ...habit.frequency,
+      period: "week" as const,
+    },
+  };
+
+  await habitService.add(serializedHabit);
   await loadHabits();
   showAddModal.value = false;
 };
@@ -55,7 +69,17 @@ const handleEditHabit = (habit: Habit) => {
 };
 
 const handleUpdateHabit = async (habit: Habit) => {
-  await habitService.update(habit.id!, habit);
+  if (!habit.id) return;
+
+  const serializedHabit = {
+    ...habit,
+    frequency: {
+      ...habit.frequency,
+      period: "week" as const,
+    },
+  };
+
+  await habitService.update(habit.id, serializedHabit);
   await loadHabits();
 };
 
