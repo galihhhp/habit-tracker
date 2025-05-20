@@ -7,7 +7,7 @@ const openai = new OpenAI({
 
 export const aiService = {
   async getHabitDescription(name: string): Promise<string> {
-    const prompt = `Given this habit name: "${name}", provide ONE motivating sentence that explains the benefits and importance of this habit.`;
+    const prompt = `Given this habit name: "${name}", provide a clear and concise description explaining what activities or actions are involved in practicing this habit on a regular basis. The description MUST be under 250 characters.`;
 
     const response = await openai.chat.completions.create({
       model: "gpt-4",
@@ -15,7 +15,7 @@ export const aiService = {
         {
           role: "system",
           content:
-            "You are a helpful habit coach that provides concise, motivating descriptions in ONE sentence.",
+            "You are a helpful habit coach that provides clear, practical descriptions of habit activities in less than 250 characters.",
         },
         {
           role: "user",
@@ -26,7 +26,11 @@ export const aiService = {
       temperature: 0.7,
     });
 
-    return response.choices[0].message.content || "";
+    const description = response.choices[0].message.content || "";
+
+    return description.length > 250
+      ? description.substring(0, 247) + "..."
+      : description;
   },
 
   async getHabitPredictions(
@@ -117,7 +121,7 @@ IMPORTANT: Your response must be a valid JSON object with no additional text or 
         targetPrediction: parsed.targetPrediction || "",
       };
     } catch (error) {
-      console.error("Failed to parse AI response:", error);
+      console.log(error);
       throw new Error("Invalid AI response format");
     }
   },

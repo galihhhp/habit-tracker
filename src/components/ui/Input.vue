@@ -21,25 +21,8 @@ const emit = defineEmits(["update:modelValue"]);
         >Generating...</span
       >
     </label>
-    <textarea
-      v-if="type === 'textarea'"
-      :value="modelValue"
-      @input="
-        emit('update:modelValue', ($event.target as HTMLTextAreaElement).value)
-      "
-      :placeholder="placeholder"
-      :required="required"
-      :disabled="loading"
-      rows="3"
-      :class="[
-        'w-full p-2 border rounded-md text-base transition-colors',
-        error
-          ? 'border-red-300 focus:border-red-500 focus:ring-red-500'
-          : 'border-gray-300 focus:border-gray-500 focus:ring-gray-500',
-        loading ? 'bg-gray-50' : '',
-      ]" />
+
     <input
-      v-else
       :value="modelValue"
       @input="
         emit('update:modelValue', ($event.target as HTMLInputElement).value)

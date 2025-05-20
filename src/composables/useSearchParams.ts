@@ -1,5 +1,5 @@
-import { ref, watch } from 'vue';
-import { useRoute, useRouter } from 'vue-router';
+import { ref, watch } from "vue";
+import { useRoute, useRouter } from "vue-router";
 
 export function useSearchParams() {
   const route = useRoute();
@@ -21,7 +21,9 @@ export function useSearchParams() {
     router.replace({ query });
   };
 
-  watch([searchQuery, sortBy, filterBy, page], updateSearchParams, { deep: true });
+  watch([searchQuery, sortBy, filterBy, page], updateSearchParams, {
+    deep: true,
+  });
 
   return {
     searchQuery,
@@ -30,4 +32,4 @@ export function useSearchParams() {
     page,
     itemsPerPage,
   };
-} 
+}

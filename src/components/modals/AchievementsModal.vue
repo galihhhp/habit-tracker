@@ -51,6 +51,20 @@ const nextBadge = computed(() => {
 
 const allAchievements = [
   {
+    title: "Milestone Achievements",
+    achievements: [
+      {
+        id: "first_checkin",
+        name: "First Step",
+        description: "Complete your first check-in",
+        icon: "🌟",
+        points: 5,
+        type: "milestone",
+        requirement: 1,
+      },
+    ],
+  },
+  {
     title: "Streak Achievements",
     achievements: [
       {

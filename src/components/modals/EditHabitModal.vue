@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { ref, watch, onMounted, onUnmounted, computed } from "vue";
+import { ref, watch, onMounted, onUnmounted, reactive } from "vue";
 import type { Habit } from "@/services/db";
 import { aiService } from "@/services/ai";
 import Input from "../ui/Input.vue";
-import Select from "../ui/Select.vue";
 import Button from "../ui/Button.vue";
 import Modal from "../ui/Modal.vue";
+import TextArea from "../ui/TextArea.vue";
+import { habitSchema } from "@/schemas/habit";
 
 const props = defineProps<{
   isOpen: boolean;
@@ -17,43 +18,114 @@ const emit = defineEmits<{
   (e: "save", habit: Habit): void;
 }>();
 
-const name = ref("");
-const description = ref("");
-const startDate = ref("");
-const endDate = ref("");
-
-const minEndDate = computed(() => startDate.value || "");
-
 const isGeneratingDescription = ref(false);
+const showErrors = ref(false);
+const formErrors = reactive({
+  name: "",
+  description: "",
+  startDate: "",
+  endDate: "",
+});
+
+const formData = reactive({
+  name: "",
+  description: "",
+  startDate: "",
+  endDate: "",
+});
+
+const getFieldError = (field: keyof typeof formErrors) => {
+  return showErrors.value ? formErrors[field] : "";
+};
 
 watch(
   () => props.habit,
   (newHabit) => {
     if (newHabit) {
-      name.value = newHabit.name;
-      description.value = newHabit.description || "";
-      startDate.value = newHabit.startDate.toISOString().split("T")[0];
-      endDate.value = newHabit.endDate.toISOString().split("T")[0];
+      formData.name = newHabit.name;
+      formData.description = newHabit.description || "";
+      formData.startDate = new Date(newHabit.startDate)
+        .toISOString()
+        .split("T")[0];
+      formData.endDate = new Date(newHabit.endDate).toISOString().split("T")[0];
     }
   },
   { immediate: true }
 );
 
-const handleSubmit = () => {
-  if (!name.value.trim() || !startDate.value || !endDate.value) return;
+const clearErrors = () => {
+  formErrors.name = "";
+  formErrors.description = "";
+  formErrors.startDate = "";
+  formErrors.endDate = "";
+};
 
-  const start = new Date(startDate.value);
-  const end = new Date(endDate.value);
+watch(
+  () => props.isOpen,
+  (isOpen) => {
+    if (isOpen) {
+      showErrors.value = false;
+      clearErrors();
+    } else {
+      showErrors.value = false;
+    }
+  },
+  { immediate: true }
+);
 
-  if (end < start) {
-    alert("End date must be after start date");
+const generateDescription = async () => {
+  if (!formData.name || isGeneratingDescription.value) return;
+
+  isGeneratingDescription.value = true;
+  try {
+    formData.description = await aiService.getHabitDescription(formData.name);
+  } catch (error) {
+    console.log(error);
+  } finally {
+    isGeneratingDescription.value = false;
+  }
+};
+
+const validateForm = () => {
+  clearErrors();
+  let isValid = true;
+
+  const result = habitSchema.safeParse(formData);
+  if (!result.success) {
+    const { errors } = result.error;
+    errors.forEach((err) => {
+      const path = err.path[0] as keyof typeof formErrors;
+      formErrors[path] = err.message;
+    });
+    isValid = false;
+  }
+
+  if (formData.startDate && formData.endDate) {
+    const start = new Date(formData.startDate);
+    const end = new Date(formData.endDate);
+    if (end < start) {
+      formErrors.endDate = "End date must be after start date";
+      isValid = false;
+    }
+  }
+
+  return isValid;
+};
+
+const onSubmit = () => {
+  showErrors.value = true;
+
+  if (!validateForm()) {
     return;
   }
 
+  const start = new Date(formData.startDate);
+  const end = new Date(formData.endDate);
+
   emit("save", {
     ...props.habit,
-    name: name.value.trim(),
-    description: description.value.trim(),
+    name: formData.name,
+    description: formData.description,
     startDate: start,
     endDate: end,
     history: props.habit.history.map((h) => ({
@@ -61,20 +133,8 @@ const handleSubmit = () => {
       date: new Date(h.date),
     })),
   });
-};
 
-const generateDescription = async () => {
-  if (!name.value || isGeneratingDescription.value) return;
-
-  isGeneratingDescription.value = true;
-  try {
-    const aiDescription = await aiService.getHabitDescription(name.value);
-    description.value = aiDescription;
-  } catch (error) {
-    console.error("Failed to generate description:", error);
-  } finally {
-    isGeneratingDescription.value = false;
-  }
+  showErrors.value = false;
 };
 
 const handleKeyDown = (e: KeyboardEvent) => {
@@ -83,7 +143,7 @@ const handleKeyDown = (e: KeyboardEvent) => {
   if (e.key === "Escape") {
     emit("close");
   } else if (e.key === "Enter" && e.ctrlKey) {
-    handleSubmit();
+    onSubmit();
   }
 };
 
@@ -100,46 +160,46 @@ onUnmounted(() => {
   <Modal :is-open="isOpen" @close="emit('close')">
     <div class="p-6">
       <h2 class="text-lg font-medium text-gray-900 mb-4">Edit Habit</h2>
-      <form @submit.prevent="handleSubmit" class="space-y-4">
+      <form @submit.prevent="onSubmit" class="space-y-4">
         <Input
-          v-model="name"
+          v-model="formData.name"
           label="Name"
           placeholder="Enter habit name"
-          required />
+          :error="getFieldError('name')" />
 
-        <div class="space-y-2">
-          <div class="flex justify-between items-center">
-            <label class="block text-sm font-medium text-gray-700"
-              >Description</label
-            >
-            <Button
-              type="button"
-              variant="secondary"
-              size="sm"
-              :loading="isGeneratingDescription"
-              @click="generateDescription">
-              {{
-                isGeneratingDescription
-                  ? "Generating..."
-                  : "✨ Generate with AI"
-              }}
-            </Button>
-          </div>
-          <textarea
-            v-model="description"
-            rows="3"
-            class="w-full rounded-md border-gray-300 shadow-sm focus:border-gray-800 focus:ring-gray-800"
-            placeholder="Describe your habit"></textarea>
+        <div class="flex justify-between items-center">
+          <label class="block text-sm font-medium text-gray-700"
+            >Description</label
+          >
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            :loading="isGeneratingDescription"
+            @click="generateDescription">
+            {{
+              isGeneratingDescription ? "Generating..." : "✨ Generate with AI"
+            }}
+          </Button>
         </div>
-
-        <Input v-model="startDate" label="Start Date" type="date" required />
+        <TextArea
+          v-model="formData.description"
+          :rows="3"
+          :maxLength="250"
+          placeholder="Describe your habit (required, max 250 characters)"
+          :error="getFieldError('description')" />
 
         <Input
-          v-model="endDate"
+          v-model="formData.startDate"
+          label="Start Date"
+          type="date"
+          :error="getFieldError('startDate')" />
+
+        <Input
+          v-model="formData.endDate"
           label="End Date"
           type="date"
-          :min="minEndDate"
-          required />
+          :error="getFieldError('endDate')" />
 
         <div class="flex justify-end gap-3">
           <Button variant="secondary" @click="emit('close')">Cancel</Button>

@@ -49,7 +49,7 @@ const checkInactivity = (habit: Habit): boolean => {
 
   const daysSinceLastCheckIn = Math.floor(
     (new Date().getTime() - new Date(lastCheckIn.date).getTime()) /
-    (1000 * 60 * 60 * 24)
+      (1000 * 60 * 60 * 24)
   );
 
   return daysSinceLastCheckIn >= 14;
@@ -58,7 +58,7 @@ const checkInactivity = (habit: Habit): boolean => {
 export const habitService = {
   getAll: async () => {
     const habits = await db.table("habits").toArray();
-    return habits.map(habit => {
+    return habits.map((habit) => {
       const isInactive = checkInactivity(habit);
       if (isInactive && habit.isActive) {
         db.table("habits").update(habit.id!, { isActive: false });
@@ -71,10 +71,12 @@ export const habitService = {
         endDate: new Date(habit.endDate),
         createdAt: new Date(habit.createdAt),
         updatedAt: new Date(habit.updatedAt),
-        history: habit.history.map((h: { date: Date | string; completed: boolean }) => ({
-          ...h,
-          date: new Date(h.date)
-        }))
+        history: habit.history.map(
+          (h: { date: Date | string; completed: boolean }) => ({
+            ...h,
+            date: new Date(h.date),
+          })
+        ),
       };
     });
   },
@@ -87,22 +89,26 @@ export const habitService = {
       endDate: new Date(habit.endDate).toISOString(),
       createdAt: timestamp.toISOString(),
       updatedAt: timestamp.toISOString(),
-      history: habit.history.map((h: { date: Date | string; completed: boolean }) => ({
-        ...h,
-        date: new Date(h.date).toISOString()
-      })),
-      completionRate: 0
+      history: habit.history.map(
+        (h: { date: Date | string; completed: boolean }) => ({
+          ...h,
+          date: new Date(h.date).toISOString(),
+        })
+      ),
+      completionRate: 0,
     };
     return await db.table("habits").add(newHabit);
   },
 
-  update: async (id: number, changes: Partial<Omit<Habit, "id" | "createdAt">>) => {
+  update: async (
+    id: number,
+    changes: Partial<Omit<Habit, "id" | "createdAt">>
+  ) => {
     const updateData = {
       ...changes,
-      updatedAt: new Date().toISOString()
+      updatedAt: new Date().toISOString(),
     };
 
-    // Convert any Date objects to ISO strings
     if (updateData.startDate instanceof Date) {
       updateData.startDate = updateData.startDate.toISOString();
     }
@@ -110,10 +116,12 @@ export const habitService = {
       updateData.endDate = updateData.endDate.toISOString();
     }
     if (updateData.history) {
-      updateData.history = updateData.history.map((h: { date: Date | string; completed: boolean }) => ({
-        ...h,
-        date: h.date instanceof Date ? h.date.toISOString() : h.date
-      }));
+      updateData.history = updateData.history.map(
+        (h: { date: Date | string; completed: boolean }) => ({
+          ...h,
+          date: h.date instanceof Date ? h.date.toISOString() : h.date,
+        })
+      );
     }
 
     return await db.table("habits").update(id, updateData);
@@ -122,57 +130,60 @@ export const habitService = {
   delete: async (id: number) => {
     await db.table("checkIns").where("habitId").equals(id).delete();
     return await db.table("habits").delete(id);
-  }
+  },
 };
 
 export const checkInService = {
   getForHabit: async (habitId: number, startDate: Date, endDate: Date) => {
-    const checkIns = await db.table("checkIns")
+    const checkIns = await db
+      .table("checkIns")
       .where("habitId")
       .equals(habitId)
-      .and(checkIn => {
+      .and((checkIn) => {
         const date = new Date(checkIn.date);
         return date >= startDate && date <= endDate;
       })
       .toArray();
 
-    return checkIns.map(checkIn => ({
+    return checkIns.map((checkIn) => ({
       ...checkIn,
       date: new Date(checkIn.date),
-      createdAt: new Date(checkIn.createdAt)
+      createdAt: new Date(checkIn.createdAt),
     }));
   },
 
   getForDate: async (date: Date) => {
-    const checkIns = await db.table("checkIns")
+    const checkIns = await db
+      .table("checkIns")
       .where("date")
       .equals(date)
       .toArray();
 
-    return checkIns.map(checkIn => ({
+    return checkIns.map((checkIn) => ({
       ...checkIn,
       date: new Date(checkIn.date),
-      createdAt: new Date(checkIn.createdAt)
+      createdAt: new Date(checkIn.createdAt),
     }));
   },
 
   toggle: async (habitId: number, date: Date) => {
-    const existing = await db.table("checkIns")
+    const existing = await db
+      .table("checkIns")
       .where(["habitId", "date"])
       .equals([habitId, date])
       .first();
 
     if (existing) {
       return await db.table("checkIns").update(existing.id!, {
-        completed: !existing.completed
+        completed: !existing.completed,
       });
     } else {
       return await db.table("checkIns").add({
         habitId,
         date,
         completed: true,
-        createdAt: new Date()
+        createdAt: new Date(),
       });
     }
-  }
+  },
 };

@@ -178,6 +178,7 @@ const toggleDay = async (date: Date) => {
 
   await checkInService.toggle(props.habit.id, date);
   await loadWeekCheckIns();
+  await loadHabitHistory();
 
   const isCompleted = weekCheckIns.value.find((c) => {
     const checkInDate = new Date(c.date);
@@ -326,7 +327,7 @@ const generatePredictions = async () => {
       })),
     });
   } catch (error) {
-    console.error("Failed to generate predictions:", error);
+    console.log(error);
   } finally {
     isGeneratingPredictions.value = false;
   }
