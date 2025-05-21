@@ -135,16 +135,14 @@ const todayStatusClass = computed(() => {
       </div>
     </div>
 
-    <div class="w-full">
+    <div class="w-full flex flex-col gap-3">
       <Calendar
+        expanded
         :attributes="attributes"
         @dayclick="handleDayClick"
         trim-weeks
         :from="defaultFrom"
-        :to="defaultTo"
-        color="gray"
-        :is-expanded="true"
-        class="v-calendar-custom">
+        :to="defaultTo">
         <template #day-content="{ day, attributes }">
           <div
             class="flex flex-col items-center justify-center h-full py-1 px-0.5 rounded transition-all duration-200"
@@ -167,46 +165,25 @@ const todayStatusClass = computed(() => {
           </div>
         </template>
       </Calendar>
-    </div>
-
-    <div class="mt-3 w-full">
-      <div class="bg-gray-50 p-3 rounded-lg border border-gray-200">
-        <div
-          class="flex flex-col sm:flex-row sm:justify-between gap-6 sm:gap-2">
-          <div class="mb-4 sm:mb-0">
-            <h3 class="text-sm font-medium text-gray-700 mb-2">
-              Check-in Guide
-            </h3>
-            <div class="flex flex-col space-y-2">
-              <div class="flex items-center">
-                <span class="h-2 w-2 rounded-full bg-green-500 mr-2"></span>
-                <span class="text-xs">Completed</span>
-              </div>
-              <div class="flex items-center">
-                <span class="h-2 w-2 rounded-full bg-gray-300 mr-2"></span>
-                <span class="text-xs">Not Completed</span>
+      <div class="w-full">
+        <div class="bg-gray-50 p-3 rounded-lg border border-gray-200">
+          <div
+            class="flex flex-col sm:flex-row sm:justify-between gap-6 sm:gap-2">
+            <div class="mb-4 sm:mb-0">
+              <h3 class="text-sm font-medium text-gray-700 mb-2">
+                Check-in Guide
+              </h3>
+              <div class="flex flex-col space-y-2">
+                <div class="flex items-center">
+                  <span class="h-2 w-2 rounded-full bg-green-500 mr-2"></span>
+                  <span class="text-xs">Completed</span>
+                </div>
+                <div class="flex items-center">
+                  <span class="h-2 w-2 rounded-full bg-gray-300 mr-2"></span>
+                  <span class="text-xs">Not Completed</span>
+                </div>
               </div>
             </div>
-          </div>
-
-          <div class="mb-4 sm:mb-0">
-            <h4 class="text-xs font-medium text-gray-700 mb-2">This Month</h4>
-            <div class="text-xs text-gray-600">
-              Completed:
-              {{ props.checkIns.filter((c) => c.completed).length }}
-            </div>
-          </div>
-
-          <div>
-            <h4 class="text-xs font-medium text-gray-700 mb-2">Tips</h4>
-            <ul class="text-xs text-gray-600 list-disc pl-4 space-y-1">
-              <li class="pr-1">Check-in daily to build consistency</li>
-              <li class="pr-1">Build streaks to earn achievements</li>
-              <li class="pr-1">
-                Complete at least your chosen frequency, but daily check-ins are
-                recommended
-              </li>
-            </ul>
           </div>
         </div>
       </div>
@@ -215,19 +192,6 @@ const todayStatusClass = computed(() => {
 </template>
 
 <style scoped>
-.v-calendar-custom {
-  width: 100%;
-}
-
-.v-calendar-custom :deep(.vc-container) {
-  width: 100%;
-  max-width: 100%;
-  border: 1px solid #e5e7eb;
-  border-radius: 0.5rem;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
-  margin: 0;
-}
-
 .bg-green-500 {
   background-color: #10b981;
 }

@@ -1,24 +1,24 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from "vue";
-import type { Habit, CheckIn } from "../services/db";
+import type { Habit, CheckIn } from "@/services/db";
 import type { Achievement } from "@/services/achievements";
-import { checkInService, habitService } from "../services/db";
+import { checkInService, habitService } from "@/services/db";
 import {
   checkAchievements,
   getTotalPoints,
   removeInvalidAchievements,
 } from "@/services/achievements";
 import { aiService } from "@/services/ai";
-import Button from "./ui/Button.vue";
-import Calendar from "./ui/Calendar.vue";
-import HabitCalendar from "./ui/HabitCalendar.vue";
-import CompletionModal from "./modals/CompletionModal.vue";
-import StreakModal from "./modals/StreakModal.vue";
-import HistoryModal from "./modals/HistoryModal.vue";
-import EditHabitModal from "./modals/EditHabitModal.vue";
-import DropdownMenu from "./ui/DropdownMenu.vue";
-import AchievementsModal from "./modals/AchievementsModal.vue";
-import HabitPredictions from "./predictions/HabitPredictions.vue";
+import Button from "../ui/Button.vue";
+import Calendar from "../ui/Calendar.vue";
+import HabitCalendar from "./HabitCalendar.vue";
+import CompletionModal from "../modals/CompletionModal.vue";
+import StreakModal from "../modals/StreakModal.vue";
+import HistoryModal from "../modals/HistoryModal.vue";
+import HabitFormModal from "../forms/HabitFormModal.vue";
+import DropdownMenu from "../ui/DropdownMenu.vue";
+import AchievementsModal from "../modals/AchievementsModal.vue";
+import HabitPredictions from "../predictions/HabitPredictions.vue";
 
 const props = defineProps<{
   habit: Habit;
@@ -200,9 +200,27 @@ const loadPoints = async () => {
   }
 };
 
-const save = (updatedHabit: Habit) => {
-  emit("update", updatedHabit);
+const handleDelete = () => {
+  if (props.habit.id) {
+    emit("delete", props.habit.id);
+  }
+};
+
+const handleEdit = () => {
+  isEditing.value = true;
+};
+
+const save = (
+  updatedHabit: Habit | Omit<Habit, "id" | "createdAt" | "updatedAt">
+) => {
   isEditing.value = false;
+  if ("id" in updatedHabit) {
+    emit("update", updatedHabit);
+  }
+};
+
+const handleViewHistory = () => {
+  showHistoryModal.value = true;
 };
 
 const loadHabitHistory = async () => {
@@ -246,20 +264,6 @@ const analytics = computed(() => {
     },
   };
 });
-
-const handleDelete = () => {
-  if (props.habit.id) {
-    emit("delete", props.habit.id);
-  }
-};
-
-const handleEdit = () => {
-  isEditing.value = true;
-};
-
-const handleViewHistory = () => {
-  showHistoryModal.value = true;
-};
 
 const generatePredictions = async () => {
   if (!props.habit.id || isGeneratingPredictions.value) return;
@@ -467,9 +471,10 @@ onMounted(async () => {
     :analytics="analytics"
     @close="showHistoryModal = false" />
 
-  <EditHabitModal
+  <HabitFormModal
     :is-open="isEditing"
     :habit="habit"
+    mode="edit"
     @close="isEditing = false"
     @save="save" />
 

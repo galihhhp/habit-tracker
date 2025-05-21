@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import Modal from "../ui/Modal.vue";
+import Modal from "../layout/Modal.vue";
 import type { CheckIn } from "@/services/db";
 
 const props = defineProps<{

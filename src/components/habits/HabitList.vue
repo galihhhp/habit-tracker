@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref } from "vue";
 import type { Habit } from "@/services/db";
-import HabitItem from "@/components/HabitItem.vue";
+import HabitItem from "@/components/habits/HabitItem.vue";
 
 const props = defineProps<{
   habits: Habit[];

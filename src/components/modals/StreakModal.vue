@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import Button from "../ui/Button.vue";
-import Modal from "../ui/Modal.vue";
+import Modal from "../layout/Modal.vue";
 
 defineProps<{
   isOpen: boolean;

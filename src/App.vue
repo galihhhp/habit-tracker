@@ -2,21 +2,20 @@
 import { ref, computed, onMounted } from "vue";
 import type { Habit, CheckIn } from "./services/db";
 import { habitService, checkInService } from "./services/db";
-import AddHabitModal from "@/components/modals/AddHabitModal.vue";
-import EditHabitModal from "@/components/modals/EditHabitModal.vue";
+import HabitFormModal from "@/components/forms/HabitFormModal.vue";
 import Button from "./components/ui/Button.vue";
-import HabitList from "./components/HabitList.vue";
-import Pagination from "./components/ui/Pagination.vue";
+import HabitList from "./components/habits/HabitList.vue";
+import Pagination from "./components/layout/Pagination.vue";
 import Select from "./components/ui/Select.vue";
 import Input from "./components/ui/Input.vue";
 import { useSearchParams } from "./composables/useSearchParams";
 import DeleteConfirmationModal from "./components/modals/DeleteConfirmationModal.vue";
-import HabitItem from "./components/HabitItem.vue";
+import HabitItem from "./components/habits/HabitItem.vue";
 import HistoryModal from "./components/modals/HistoryModal.vue";
 
 const habits = ref<Habit[]>([]);
-const showAddModal = ref(false);
-const showEditModal = ref(false);
+const showHabitModal = ref(false);
+const habitModalMode = ref<"add" | "edit">("add");
 const editingHabit = ref<Habit | null>(null);
 const { searchQuery, sortBy, filterBy, page, itemsPerPage } = useSearchParams();
 const showDeleteModal = ref(false);
@@ -41,31 +40,50 @@ const loadHabits = async () => {
   }
 };
 
-const handleSaveHabit = async (
-  habit: Omit<Habit, "id" | "createdAt" | "updatedAt">
-) => {
-  const serializedHabit = {
-    ...habit,
-    startDate:
-      habit.startDate instanceof Date
-        ? habit.startDate
-        : new Date(habit.startDate),
-    endDate:
-      habit.endDate instanceof Date ? habit.endDate : new Date(habit.endDate),
-    frequency: {
-      ...habit.frequency,
-      period: "week" as const,
-    },
-  };
+const handleAddHabit = () => {
+  habitModalMode.value = "add";
+  editingHabit.value = null;
+  showHabitModal.value = true;
+};
 
-  await habitService.add(serializedHabit);
+const handleSaveHabit = async (
+  habit: Omit<Habit, "id" | "createdAt" | "updatedAt"> | Habit
+) => {
+  if (habitModalMode.value === "add") {
+    const serializedHabit = {
+      ...(habit as Omit<Habit, "id" | "createdAt" | "updatedAt">),
+      startDate:
+        habit.startDate instanceof Date
+          ? habit.startDate
+          : new Date(habit.startDate),
+      endDate:
+        habit.endDate instanceof Date ? habit.endDate : new Date(habit.endDate),
+      frequency: {
+        ...habit.frequency,
+        period: "week" as const,
+      },
+    };
+    await habitService.add(serializedHabit);
+  } else if (habitModalMode.value === "edit" && "id" in habit) {
+    const serializedHabit = {
+      ...habit,
+      frequency: {
+        ...habit.frequency,
+        period: "week" as const,
+      },
+    };
+    await habitService.update(habit.id!, serializedHabit);
+  }
+
   await loadHabits();
-  showAddModal.value = false;
+  showHabitModal.value = false;
+  editingHabit.value = null;
 };
 
 const handleEditHabit = (habit: Habit) => {
   editingHabit.value = habit;
-  showEditModal.value = true;
+  habitModalMode.value = "edit";
+  showHabitModal.value = true;
 };
 
 const handleUpdateHabit = async (habit: Habit) => {
@@ -99,19 +117,8 @@ const handleViewHistory = async (habit: Habit) => {
   showHistoryModal.value = true;
 };
 
-const handleSaveEdit = async (habit: Habit) => {
-  await habitService.update(habit.id!, habit);
-  await loadHabits();
-  showEditModal.value = false;
-  editingHabit.value = null;
-};
-
-const handleCloseAddModal = () => {
-  showAddModal.value = false;
-};
-
-const handleCloseEditModal = () => {
-  showEditModal.value = false;
+const handleCloseHabitModal = () => {
+  showHabitModal.value = false;
   editingHabit.value = null;
 };
 
@@ -191,13 +198,22 @@ onMounted(loadHabits);
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div class="flex justify-between items-center mb-8">
         <h1 class="text-3xl font-bold text-gray-900">Habit Tracker</h1>
-        <Button variant="primary" @click="showAddModal = true">
-          Add Habit
-        </Button>
+        <Button variant="primary" @click="handleAddHabit"> Add Habit </Button>
       </div>
 
       <div class="bg-white rounded-lg border md:mx-40">
         <div class="p-6">
+          <div class="mb-6">
+            <h4 class="text-md font-semibold text-gray-700 mb-2">Tips:</h4>
+            <ul class="text-sm text-gray-600 list-disc pl-4 space-y-1">
+              <li class="pr-1">Check-in daily to build consistency.</li>
+              <li class="pr-1">Build streaks to earn achievements.</li>
+              <li class="pr-1">
+                Complete at least your chosen frequency, but daily check-ins are
+                recommended.
+              </li>
+            </ul>
+          </div>
           <div class="flex flex-col sm:flex-row gap-4 mb-6 items-center">
             <div class="flex-1 w-full md:w-auto">
               <Input
@@ -235,17 +251,12 @@ onMounted(loadHabits);
       </div>
     </div>
 
-    <AddHabitModal
-      :is-open="showAddModal"
-      @close="handleCloseAddModal"
-      @save="handleSaveHabit" />
-
-    <EditHabitModal
-      v-if="editingHabit"
-      :is-open="showEditModal"
+    <HabitFormModal
+      :is-open="showHabitModal"
+      :mode="habitModalMode"
       :habit="editingHabit"
-      @close="handleCloseEditModal"
-      @save="handleSaveEdit" />
+      @close="handleCloseHabitModal"
+      @save="handleSaveHabit" />
 
     <DeleteConfirmationModal
       :is-open="showDeleteModal"
@@ -283,6 +294,7 @@ onMounted(loadHabits);
                 habitHistory.length) *
                 100
             ) || 0,
+          longestStreak: 0,
         },
       }"
       @close="handleCloseHistoryModal" />

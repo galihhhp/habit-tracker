@@ -49,7 +49,7 @@ Name: "${name}"
 Description: "${description || "No description provided"}"
 Target Days: ${targetDays}
 
-For each time period (1 month, 3 months, 6 months, 1 year) and the final target, provide ONE descriptive sentence that captures what they'll experience, improvements they'll see, challenges they might face, and tips to overcome them.
+For each time period (1 month, 3 months, 6 months, 9 months, 1 year) and the final target, provide ONE descriptive sentence that captures what they'll experience, improvements they'll see, challenges they might face, and tips to overcome them.
 
 IMPORTANT: Your response must be a valid JSON object with this exact structure and no additional text:
 {
@@ -65,6 +65,10 @@ IMPORTANT: Your response must be a valid JSON object with this exact structure a
     {
       "period": "6 months",
       "prediction": "One descriptive sentence about their six months journey"
+    },
+    {
+      "period": "9 months",
+      "prediction": "One descriptive sentence about their nine months journey"
     },
     {
       "period": "1 year",

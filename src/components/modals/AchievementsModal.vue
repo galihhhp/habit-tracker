@@ -2,7 +2,7 @@
 import { defineProps, defineEmits, computed, ref, onMounted, watch } from "vue";
 import type { Achievement } from "@/services/achievements";
 import { getEarnedAchievements, getTotalPoints } from "@/services/achievements";
-import Modal from "../ui/Modal.vue";
+import Modal from "../layout/Modal.vue";
 import Button from "../ui/Button.vue";
 
 const props = defineProps<{
