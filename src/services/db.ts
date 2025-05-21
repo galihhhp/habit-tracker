@@ -54,7 +54,7 @@ const createDatabase = () => {
     achievements: "++id, habitId, achievementId, [habitId+achievementId]",
   });
 
-  db.on('versionchange', function (event) {
+  db.on("versionchange", function (event) {
     window.location.reload();
   });
 
@@ -69,7 +69,7 @@ const checkInactivity = (habit: Habit): boolean => {
 
   const daysSinceLastCheckIn = Math.floor(
     (new Date().getTime() - new Date(lastCheckIn.date).getTime()) /
-    (1000 * 60 * 60 * 24)
+      (1000 * 60 * 60 * 24)
   );
 
   return daysSinceLastCheckIn >= 14;
@@ -279,6 +279,30 @@ export const achievementService = {
       return existing.id;
     } catch (error) {
       return null;
+    }
+  },
+
+  removeAchievement: async (habitId: number, achievementId: string) => {
+    try {
+      if (!db.tables.some((table) => table.name === "achievements")) {
+        return false;
+      }
+
+      const achievementRecord = await db
+        .table("achievements")
+        .where(["habitId", "achievementId"])
+        .equals([habitId, achievementId])
+        .first();
+
+      if (achievementRecord && achievementRecord.id) {
+        await db.table("achievements").delete(achievementRecord.id);
+        return true;
+      }
+
+      return false;
+    } catch (error) {
+      console.error("Error removing achievement:", error);
+      return false;
     }
   },
 };

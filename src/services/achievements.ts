@@ -165,6 +165,53 @@ export const checkAchievements = async (
   }
 };
 
+export const removeInvalidAchievements = async (
+  habitId: number,
+  currentStreak: number,
+  totalCompletions: number
+) => {
+  try {
+    const earned = await loadEarnedAchievements(habitId);
+
+    for (const achievementId of earned) {
+      const achievement = achievements.find((a) => a.id === achievementId);
+      if (!achievement) continue;
+
+      let isStillValid = true;
+
+      if (
+        achievement.type === "streak" &&
+        currentStreak < achievement.requirement
+      ) {
+        isStillValid = false;
+      } else if (
+        achievement.type === "completion" &&
+        totalCompletions < achievement.requirement
+      ) {
+        isStillValid = false;
+      } else if (
+        achievement.type === "milestone" &&
+        achievement.id === "first_checkin" &&
+        totalCompletions < 1
+      ) {
+        isStillValid = false;
+      }
+
+      if (!isStillValid) {
+        await achievementService.removeAchievement(habitId, achievementId);
+        earned.delete(achievementId);
+      }
+    }
+
+    earnedAchievementsCache.set(habitId, earned);
+
+    return true;
+  } catch (error) {
+    console.error("Error removing invalid achievements:", error);
+    return false;
+  }
+};
+
 export const getEarnedAchievements = async (habitId: number) => {
   try {
     const earned = await loadEarnedAchievements(habitId);

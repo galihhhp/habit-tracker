@@ -3,10 +3,15 @@ import { ref, onMounted, computed } from "vue";
 import type { Habit, CheckIn } from "../services/db";
 import type { Achievement } from "@/services/achievements";
 import { checkInService, habitService } from "../services/db";
-import { checkAchievements, getTotalPoints } from "@/services/achievements";
+import {
+  checkAchievements,
+  getTotalPoints,
+  removeInvalidAchievements,
+} from "@/services/achievements";
 import { aiService } from "@/services/ai";
 import Button from "./ui/Button.vue";
 import Calendar from "./ui/Calendar.vue";
+import HabitCalendar from "./ui/HabitCalendar.vue";
 import CompletionModal from "./modals/CompletionModal.vue";
 import StreakModal from "./modals/StreakModal.vue";
 import HistoryModal from "./modals/HistoryModal.vue";
@@ -56,45 +61,6 @@ const weekProgress = computed(() => {
   return { completed, total, percentage };
 });
 
-const weekDays = computed(() => {
-  const today = new Date();
-  const days = [];
-
-  for (let i = 6; i >= 0; i--) {
-    const date = new Date(today);
-    date.setDate(today.getDate() - i);
-    date.setHours(0, 0, 0, 0);
-
-    const checkIn = weekCheckIns.value.find((c) => {
-      const checkInDate = new Date(c.date);
-      checkInDate.setHours(0, 0, 0, 0);
-      return checkInDate.getTime() === date.getTime();
-    });
-
-    days.push({
-      date,
-      isToday: i === 0,
-      isCompleted: checkIn?.completed || false,
-    });
-  }
-
-  return days;
-});
-
-const weekStart = computed(() => {
-  const today = new Date();
-  const start = new Date(today);
-  start.setDate(today.getDate() - 6);
-  start.setHours(0, 0, 0, 0);
-  return start;
-});
-
-const weekEnd = computed(() => {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  return today;
-});
-
 const calculateStreak = async () => {
   if (!props.habit.id) return;
 
@@ -122,13 +88,18 @@ const calculateStreak = async () => {
 
     if (checkIn.completed) {
       if (!lastDate || isConsecutiveDay(lastDate, checkInDate)) {
-        tempCount++;
+        tempCount = tempCount > 0 ? tempCount + 1 : 1;
         if (checkInDate.getTime() === today.getTime()) {
           currentCount = tempCount;
         }
       } else {
         tempCount = 1;
       }
+
+      if (checkInDate.getTime() === today.getTime()) {
+        currentCount = Math.max(currentCount, 1);
+      }
+
       longestCount = Math.max(longestCount, tempCount);
     } else {
       tempCount = 0;
@@ -167,17 +138,25 @@ const toggleDay = async (date: Date) => {
 
   date.setHours(0, 0, 0, 0);
 
+  const checkInBeforeToggle = weekCheckIns.value.find((c) => {
+    const checkInDate = new Date(c.date);
+    checkInDate.setHours(0, 0, 0, 0);
+    return checkInDate.getTime() === date.getTime();
+  });
+
+  const wasCompletedBefore = checkInBeforeToggle?.completed || false;
+
   await checkInService.toggle(props.habit.id, date);
   await loadWeekCheckIns();
   await loadHabitHistory();
 
-  const isCompleted = weekCheckIns.value.find((c) => {
+  const isCompletedAfter = weekCheckIns.value.find((c) => {
     const checkInDate = new Date(c.date);
     checkInDate.setHours(0, 0, 0, 0);
     return checkInDate.getTime() === date.getTime();
   })?.completed;
 
-  if (isCompleted) {
+  if (isCompletedAfter) {
     showCompletionModal.value = true;
 
     if (currentStreak.value > 0 && currentStreak.value % 7 === 0) {
@@ -198,9 +177,21 @@ const toggleDay = async (date: Date) => {
       newAchievements.value = achievements;
       showAchievementsModal.value = true;
     }
+  } else if (wasCompletedBefore) {
+    await calculateStreak();
 
-    await loadPoints();
+    const totalCompletions = habitHistory.value.filter(
+      (c) => c.completed
+    ).length;
+
+    await removeInvalidAchievements(
+      props.habit.id,
+      currentStreak.value,
+      totalCompletions
+    );
   }
+
+  await loadPoints();
 };
 
 const loadPoints = async () => {
@@ -364,6 +355,7 @@ onMounted(async () => {
             variant="secondary"
             :loading="isGeneratingPredictions"
             :disabled="isGeneratingPredictions"
+            title="Generate insights about your habit success patterns and milestones predictions"
             @click="generatePredictions">
             {{
               isGeneratingPredictions
@@ -443,19 +435,19 @@ onMounted(async () => {
       </div>
     </div>
 
-    <div class="mt-4 space-y-6">
-      <Calendar
-        :check-ins="weekCheckIns"
-        :start-date="weekStart"
-        :end-date="weekEnd"
-        :show-week-days="true"
-        view="week"
+    <div class="mt-4">
+      <HabitCalendar
+        :check-ins="habitHistory"
         :is-editable="true"
+        :habit-id="habit.id"
         @toggle="toggleDay" />
 
-      <HabitPredictions
-        v-if="habit.predictions"
-        :predictions="habit.predictions" />
+      <div v-if="habit.predictions" class="mt-4">
+        <div class="flex justify-between items-center mb-3">
+          <h3 class="text-sm font-medium text-gray-700">AI Insights</h3>
+        </div>
+        <HabitPredictions :predictions="habit.predictions" />
+      </div>
     </div>
   </div>
 

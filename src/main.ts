@@ -5,6 +5,7 @@ import App from "./App.vue";
 import { db } from "./services/db";
 import router from "./router";
 import "@/assets/main.css";
+import { setupCalendar } from 'v-calendar';
 
 const resetDatabase = () => {
   return new Promise((resolve, reject) => {
@@ -21,16 +22,17 @@ const resetDatabase = () => {
 };
 
 db.open()
-  .then(() => {})
+  .then(() => { })
   .catch(async (err) => {
     if (err.name === "VersionError") {
       try {
         await resetDatabase();
         window.location.reload();
-      } catch (resetError) {}
+      } catch (resetError) { }
     }
   });
 
 const app = createApp(App);
 app.use(router);
+app.use(setupCalendar, {});
 app.mount("#app");
