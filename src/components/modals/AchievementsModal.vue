@@ -185,7 +185,7 @@ const allAchievements = [
 </script>
 
 <template>
-  <Modal :is-open="props.isOpen" @close="emit('close')">
+  <Modal :is-open="props.isOpen" @close="emit('close')" size="md">
     <div class="max-h-[80vh] overflow-y-auto">
       <div class="flex items-center justify-between mb-6">
         <h2 class="text-xl font-medium text-gray-900">Achievements</h2>

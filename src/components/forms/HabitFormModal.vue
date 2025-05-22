@@ -247,8 +247,7 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <Modal :is-open="isOpen" @close="emit('close')">
-    <h2 class="text-lg font-medium text-gray-900 mb-4">{{ modalTitle }}</h2>
+  <Modal :is-open="isOpen" @close="emit('close')" size="md" :title="modalTitle">
     <form @submit.prevent="onSubmit" class="space-y-4">
       <Input
         v-model="formData.name"

@@ -14,7 +14,11 @@ const emit = defineEmits<{
 </script>
 
 <template>
-  <Modal :is-open="isOpen" title="Amazing Streak! 🔥" @close="emit('close')">
+  <Modal
+    :is-open="isOpen"
+    title="Amazing Streak! 🔥"
+    @close="emit('close')"
+    size="sm">
     <div class="space-y-4">
       <p class="text-gray-600">
         You've maintained your habit for {{ currentStreak }} days in a row! Your

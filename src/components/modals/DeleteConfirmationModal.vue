@@ -33,7 +33,7 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <Modal :is-open="isOpen" @close="emit('close')">
+  <Modal :is-open="isOpen" @close="emit('close')" size="sm">
     <div class="p-6">
       <h2 class="text-lg font-medium text-gray-900 mb-4">Delete Habit</h2>
       <p class="text-gray-600 mb-6">

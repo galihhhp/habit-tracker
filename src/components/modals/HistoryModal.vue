@@ -25,7 +25,11 @@ const emit = defineEmits<{
 </script>
 
 <template>
-  <Modal :is-open="props.isOpen" @close="emit('close')" title="Habit History">
+  <Modal
+    :is-open="props.isOpen"
+    @close="emit('close')"
+    title="Habit History"
+    size="md">
     <div class="space-y-6">
       <div>
         <h3 class="text-lg font-medium text-gray-900 mb-3">
